@@ -34,14 +34,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lib_export_generator"
-version = "0.1.0"
-source = "git+https://github.com/SuccessfullyFailed/lib_export_generator.git#10ffad21c96dd61c6dd751c2729621268f050a40"
-dependencies = [
- "file_ref",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.169"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -52,7 +44,6 @@ name = "omni_parser"
 version = "0.1.0"
 dependencies = [
  "file_ref",
- "lib_export_generator",
 ]
 
 [[package]]
