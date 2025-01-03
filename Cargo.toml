@@ -1,0 +1,10 @@
+[package]
+name = "omni_parse"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+file_ref={ git="https://github.com/SuccessfullyFailed/file_ref.git" }
+
+[build-dependencies]
+lib_export_generator={ git="https://github.com/SuccessfullyFailed/lib_export_generator.git" }
