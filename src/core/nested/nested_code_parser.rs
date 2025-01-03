@@ -1,5 +1,6 @@
-use std::{error::Error, ops::Range};
+use std::error::Error;
 use file_ref::FileRef;
+use super::{NestedCode, SegmentIdentification, SegmentIdentificationSource};
 
 
 
@@ -30,12 +31,12 @@ impl NestedCodeParser {
 		let results:Vec<NestedCode<'_>> = self.parse(contents);
 
 		// Prepare segment-names debug display.
-		let mut names:Vec<String> = self.identification.iter().map(|ident| ident.name.clone()).collect::<Vec<String>>();
+		let mut names:Vec<String> = self.identification.iter().map(|ident| ident.name().to_string()).collect::<Vec<String>>();
 		names.dedup();
 
 		// Create debug display file.
 		let mut debug_code:String = String::new();
-		let mut injections:Vec<(usize, Option<String>)> = results.iter().map(|result| [(result.start, Some(result.identifier_name.clone())), (result.end, None)]).flatten().collect::<Vec<(usize, Option<String>)>>();
+		let mut injections:Vec<(usize, Option<String>)> = results.iter().map(|result| [(result.start(), Some(result.type_name().to_string())), (result.end(), None)]).flatten().collect::<Vec<(usize, Option<String>)>>();
 		injections.sort_by(|a, b| a.0.cmp(&b.0));
 		let mut last_injection_position:usize = 0;
 		for (position, name) in injections {
@@ -69,12 +70,12 @@ impl NestedCodeParser {
 			let mut found_anything:bool = false;
 
 			// Find start-identification.
-			let allow_sub_parse:bool = depth.last().map(|last_identification| last_identification.allow_sub_parse).unwrap_or(true);
+			let allow_sub_parse:bool = depth.last().map(|last_identification| last_identification.allow_sub_parse()).unwrap_or(true);
 			if allow_sub_parse {
 				for identification_set in &self.identification {
-					if !found_anything && Self::tag_matches_contents(&contents, cursor, &identification_set.open, &identification_set.open_escape) {
+					if !found_anything && Self::tag_matches_contents(&contents, cursor, identification_set.open(), identification_set.open_escape()) {
 						depth.push(identification_set);
-						results.push(NestedCode::new(contents, cursor..cursor + identification_set.open.len(), &identification_set.name));
+						results.push(NestedCode::new(contents, cursor..cursor + identification_set.open().len(), depth.len(), &identification_set.name()));
 						found_anything = true;
 						continue;
 					}
@@ -84,8 +85,8 @@ impl NestedCodeParser {
 			// Find end-identification.
 			if !found_anything {
 				if let Some(identification_set) = depth.last() {
-					if Self::tag_matches_contents(&contents, cursor, &identification_set.close, &identification_set.close_escape) {
-						results.last_mut().unwrap().end = cursor + identification_set.close.len();
+					if Self::tag_matches_contents(&contents, cursor, identification_set.close(), &identification_set.close_escape()) {
+						results.last_mut().unwrap().set_end(cursor + identification_set.close().len());
 						found_anything = true;
 					}
 				}
@@ -104,7 +105,7 @@ impl NestedCodeParser {
 	}
 
 	/// Check if a specific tag matches a specific place in contents.
-	fn tag_matches_contents(contents:&str, cursor:usize, tag:&String, escape:&Option<String>) -> bool {
+	fn tag_matches_contents(contents:&str, cursor:usize, tag:&str, escape:&Option<String>) -> bool {
 		if contents.len() >= cursor + tag.len() && &contents[cursor..cursor + tag.len()] == tag {
 			if let Some(escape) = escape {
 				cursor >= escape.len() && &contents[cursor - escape.len()..cursor] != escape
@@ -113,107 +114,6 @@ impl NestedCodeParser {
 			}
 		} else {
 			false
-		}
-	}
-}
-
-
-
-pub struct NestedCode<'a> {
-	start:usize,
-	end:usize,
-	contents:&'a str,
-	identifier_name:String
-}
-impl<'a> NestedCode<'a> {
-
-	/* CONSTRUCTOR METHODS */
-
-	/// Create a new code segment.
-	pub fn new(contents:&'a str, range:Range<usize>, identifier_name:&str) -> NestedCode<'a> {
-		NestedCode {
-			start: range.start,
-			end: range.end,
-			contents: &contents[range],
-			identifier_name: identifier_name.to_string()
-		}
-	}
-
-
-	
-	/* PROPERTY GETTER METHODS */
-
-	/// Return the NestedCode's start.
-	pub fn start(&self) -> usize {
-		self.start
-	}
-	
-	/// Return the NestedCode's end.
-	pub fn end(&self) -> usize {
-		self.end
-	}
-	
-	/// Return the NestedCode's contents.
-	pub fn contents(&self) -> &str {
-		&self.contents
-	}
-	
-	/// Return the NestedCode's identifier_name.
-	pub fn code_type(&self) -> &str {
-		&self.identifier_name
-	}
-}
-
-
-
-pub trait SegmentIdentificationSource {
-	fn to_identification(&self) -> SegmentIdentification;
-}
-impl SegmentIdentificationSource for SegmentIdentification {
-	fn to_identification(&self) -> SegmentIdentification {
-		self.clone()
-	}
-}
-impl SegmentIdentificationSource for (&str, bool, &str, &str) {
-	fn to_identification(&self) -> SegmentIdentification {
-		SegmentIdentification::new(self.0, self.1, self.2, None, self.3, None)
-	}
-}
-impl SegmentIdentificationSource for (&str, bool, &str, Option<&str>, &str, Option<&str>) {
-	fn to_identification(&self) -> SegmentIdentification {
-		SegmentIdentification::new(self.0, self.1, self.2, self.3, self.4, self.5)
-	}
-}
-impl SegmentIdentificationSource for (&str, bool, &str, &str, &str, &str) {
-	fn to_identification(&self) -> SegmentIdentification {
-		SegmentIdentification::new(self.0, self.1, self.2, if self.3.is_empty() { None } else { Some(self.3) }, self.4, if self.5.is_empty() { None } else { Some(self.5) })
-	}
-}
-
-
-
-#[derive(Clone)]
-pub struct SegmentIdentification {
-	name:String,
-	allow_sub_parse:bool,
-	open:String,
-	open_escape:Option<String>,
-	close:String,
-	close_escape:Option<String>
-}
-impl SegmentIdentification {
-	
-	/* CONSTRUCTOR METHODS */
-	
-	/// Create a new depth modifier.
-	pub fn new(name:&str, allow_sub_parse:bool, open:&str, open_escape:Option<&str>, close:&str, close_escape:Option<&str>) -> SegmentIdentification {
-		SegmentIdentification {
-			name: name.to_string(),
-			allow_sub_parse,
-			open: open.to_string(),
-			open_escape: open_escape.map(|increase_escape| increase_escape.to_string()),
-			close: close.to_string(),
-			close_escape: close_escape.map(|decrease_escape| decrease_escape.to_string())
 		}
 	}
 }
