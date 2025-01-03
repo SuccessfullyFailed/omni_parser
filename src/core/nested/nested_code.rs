@@ -19,7 +19,7 @@ impl<'a> NestedCode<'a> {
 			start: range.start,
 			end: range.end,
 			depth,
-			contents: &contents[range],
+			contents: &contents,
 			identifier_name: identifier_name.to_string()
 		}
 	}
@@ -54,7 +54,7 @@ impl<'a> NestedCode<'a> {
 	
 	/// Return the NestedCode's contents.
 	pub fn contents(&self) -> &str {
-		&self.contents
+		&self.contents[self.start..self.end]
 	}
 	
 	/// Return the NestedCode's identifier_name.

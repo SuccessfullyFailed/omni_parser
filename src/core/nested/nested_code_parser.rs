@@ -5,6 +5,7 @@ use super::{NestedCode, SegmentIdentification, SegmentIdentificationSource};
 
 
 const HTML_REPLACEMENTS:&[(&str, &str)] = &[("<", "&lt;"), (">", "&gt;"), ("\"", "&quot;"), ("\n", "<br>"), ("\t", "<span class=\"spacer\"></span>")];
+pub const UNMATCHED_SEGMENT_NAME:&str = "UNNAMED";
 
 
 
@@ -28,7 +29,7 @@ impl NestedCodeParser {
 
 	/// Parse a piece of code and create a debug document.
 	pub fn parse_debug(&self, contents:&str, output_file_path:&str) -> Result<(), Box<dyn Error>> {
-		let results:Vec<NestedCode<'_>> = self.parse(contents);
+		let results:Vec<NestedCode<'_>> = self.parse(contents, false);
 
 		// Prepare segment-names debug display.
 		let mut names:Vec<String> = self.identification.iter().map(|ident| ident.name().to_string()).collect::<Vec<String>>();
@@ -51,7 +52,7 @@ impl NestedCodeParser {
 		debug_code += &contents[last_injection_position..];
 		debug_code += "\n<style>\n";
 		debug_code += "\t.spacer { margin-left: 20px; }";
-		debug_code += "\t.identifier { color: #0FF000; background-color: #0000FF; }";
+		debug_code += "\t.identifier { color: #0FF000; background-color: #0000FF; border: solid black 1px; }";
 		debug_code += &names.iter().enumerate().map(|(shift, name)| format!("\t.{name} {} filter: hue-rotate({}deg); {}", '{', (shift as f32 / names.len() as f32 * 360.0) as usize, '}')).collect::<Vec<String>>().join("\n");
 		debug_code += "\n</style>";
 
@@ -60,11 +61,12 @@ impl NestedCodeParser {
 	}
 
 	/// Parse a piece of code.
-	pub fn parse<'a>(&self, contents:&'a str) -> Vec<NestedCode<'a>> {
+	pub fn parse<'a>(&self, contents:&'a str, include_unmatched:bool) -> Vec<NestedCode<'a>> {
 		let mut depth:Vec<&SegmentIdentification> = Vec::new();
 		let mut results:Vec<NestedCode> = Vec::new();
 
 		// Loop through code.
+		let mut last_unmatched_cursor:usize = 0;
 		let mut cursor:usize = 0;
 		while cursor < contents.len() {
 			let mut found_anything:bool = false;
@@ -74,8 +76,12 @@ impl NestedCodeParser {
 			if allow_sub_parse {
 				for identification_set in &self.identification {
 					if !found_anything && Self::tag_matches_contents(&contents, cursor, identification_set.open(), identification_set.open_escape()) {
+						if include_unmatched && depth.is_empty() && last_unmatched_cursor != cursor {
+							results.push(NestedCode::new(&contents, last_unmatched_cursor..cursor, 0, UNMATCHED_SEGMENT_NAME));
+							last_unmatched_cursor = cursor;
+						}
 						depth.push(identification_set);
-						results.push(NestedCode::new(contents, cursor..cursor + identification_set.open().len(), depth.len(), &identification_set.name()));
+						results.push(NestedCode::new(contents, cursor..cursor, depth.len(), &identification_set.name()));
 						found_anything = true;
 						continue;
 					}
@@ -86,7 +92,9 @@ impl NestedCodeParser {
 			if !found_anything {
 				if let Some(identification_set) = depth.last() {
 					if Self::tag_matches_contents(&contents, cursor, identification_set.close(), &identification_set.close_escape()) {
-						results.last_mut().unwrap().set_end(cursor + identification_set.close().len());
+						if let Some(result) = results.iter_mut().rev().find(|result_set| result_set.type_name() == identification_set.name() && result_set.start() == result_set.end()) {
+							result.set_end(cursor + identification_set.close().len());
+						}
 						found_anything = true;
 					}
 				}
@@ -95,9 +103,20 @@ impl NestedCodeParser {
 				}
 			}
 
-
 			// Increment cursor.
 			cursor += 1;
+		}
+
+		// Add trail.
+		if !depth.is_empty() {
+			while !depth.is_empty() {
+				let depth_node:&SegmentIdentification = depth.remove(depth.len() - 1);
+				if let Some(result) = results.iter_mut().rev().find(|result_set| result_set.type_name() == depth_node.name()) {
+					result.set_end(cursor);
+				}
+			}
+		} else if include_unmatched && last_unmatched_cursor != cursor {
+			results.push(NestedCode::new(&contents, last_unmatched_cursor..cursor, 0, UNMATCHED_SEGMENT_NAME));
 		}
 
 		// Return results.
