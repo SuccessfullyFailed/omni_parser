@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-	use crate::{ NestedCode, NestedCodeParser, UNMATCHED_SEGMENT_NAME };
+	use crate::{ NestedCode, NestedCodeParser, UNMATCHED_WHITE_SPACE_NAME };
 
 	/* HELPER FUNCTIONS */
 
@@ -20,8 +20,8 @@ mod tests {
 		NestedCodeParser::new(vec![
 			&("comment", false, "//", "\n"),
 			&("scope", true, "{", "}"),
-			&("if-statement", false, "if ", " "),
-			&("print-statement", true, "println!(", ")")
+			&("if-statement", true, "if ", " "),
+			&("print-statement", true, "println!(", ");")
 		])
 	}
 	fn example_results() -> Vec<NestedCode<'static>> {
@@ -64,13 +64,12 @@ mod tests {
 
 	#[test]
 	fn test_include_unmatched() {
-		let results:Vec<NestedCode<'_>> = example_parser().include_unmatched().parse(EXAMPLE_TEXT);
-		assert_eq!(results[0].type_name(), UNMATCHED_SEGMENT_NAME);
+		let results:Vec<NestedCode<'_>> = example_parser().include_unmatched(true).parse(EXAMPLE_TEXT);
+		assert_eq!(results[0].type_name(), UNMATCHED_WHITE_SPACE_NAME);
 		assert_eq!(results[0].depth(), 0);
 		assert_eq!(results.iter().filter(|code| code.type_name() == "if-statement").count(), 2);
 		assert_eq!(results.iter().filter(|code| code.type_name() == "print-statement").count(), 1);
 		assert!(results.iter().find(|code| code.contents().contains("let thing_result = do_the_thing();")).is_some());
-		assert_eq!(results.iter().map(|result| result.contents()).collect::<Vec<&str>>().join(""), EXAMPLE_TEXT);
 	}
 
 	#[test]
@@ -80,5 +79,32 @@ mod tests {
 		assert_eq!(results[0].depth(), 0);
 		assert_eq!(results.iter().filter(|code| code.type_name() == "if-statement").count(), 3);
 		assert_eq!(results.iter().filter(|code| code.type_name() == "print-statement").count(), 1);
+	}
+
+	#[test]
+	fn test_full_result() {
+		let results:Vec<NestedCode<'_>> = example_parser().include_unmatched(true).match_any_white_space().parse(EXAMPLE_TEXT);
+		let expected = [
+			(0, UNMATCHED_WHITE_SPACE_NAME, None),
+			(0, "if-statement", Some("if necessary ")),
+			(0, "scope", None),
+			(1, "comment", Some("// Makes the program do the expected thing.\n")),
+			(1, "if-statement", Some("if thing_result.is_ok() ")),
+			(1, "scope", None),
+			(2, "print-statement", Some("println!(\"Successful thinging complete! Exited with error code {}.\", get_code());")),
+			(3, "scope", Some("{}")),
+			(0, UNMATCHED_WHITE_SPACE_NAME, None),
+			(0, "if-statement", Some("if	 weirdly_spaced_bool ")),
+			(0, "scope", None),
+			(1, "comment", Some("// This comment contains white-space, but is not split up despite it's white-space end-tag.\n"))
+		];
+		for (index, (real, expected)) in results.iter().map(|result| (result.depth(), result.type_name(), result.contents())).zip(expected).enumerate() {
+			println!("Result {index}");
+			if let Some(expected_contents) = expected.2 {
+				assert_eq!((real.0, real.1, real.2), (expected.0, expected.1, expected_contents));
+			} else {
+				assert_eq!((real.0, real.1), (expected.0, expected.1));
+			}
+		}
 	}
 }
