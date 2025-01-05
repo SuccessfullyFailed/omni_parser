@@ -15,6 +15,7 @@ pub type IniValueDecoder = &'static dyn Fn(&str) -> String;
 pub struct IniCore {
 	data:Vec<IniCategory>,
 	encoder:IniValueEncoder,
+	decoder:IniValueDecoder,
 	source_file:Option<FileRef>
 }
 impl IniCore {
@@ -27,6 +28,7 @@ impl IniCore {
 		Ok(IniCore {
 			data: Self::parse_contents(&source_file.read()?, decoder)?,
 			encoder,
+			decoder,
 			source_file: Some(source_file)
 		})
 	}
@@ -36,6 +38,7 @@ impl IniCore {
 		Ok(IniCore {
 			data: Self::parse_contents(contents, decoder)?,
 			encoder,
+			decoder,
 			source_file: None
 		})
 	}
@@ -45,7 +48,7 @@ impl IniCore {
 	/* USAGE METHODS */
 
 	/// Parse some contents to IniCategories.
-	pub fn parse_contents(contents:&str, decoder:IniValueDecoder) -> Result<Vec<IniCategory>, Box<dyn Error>> {
+	fn parse_contents(contents:&str, decoder:IniValueDecoder) -> Result<Vec<IniCategory>, Box<dyn Error>> {
 
 		// Loop through lines in contents.
 		let mut categories:Vec<IniCategory> = Vec::new();
@@ -89,7 +92,7 @@ impl IniCore {
 
 	/// Encode values and parse to string.
 	fn to_string_encoded_values(&self) -> String {
-		self.data.iter().filter(|category| category.is_ok()).map(|category| category.to_string_encoded(self.encoder)).collect::<Vec<String>>().join("\n\n")
+		self.data.iter().filter(|category| category.is_ok()).map(|category| category.to_string_encoded(self.encoder, self.decoder)).collect::<Vec<String>>().join("\n\n")
 	}
 
 	/// Save the changes made to the original file if there is one.
@@ -166,8 +169,8 @@ impl IniCategory {
 	}
 
 	/// Encode values and parse to string.
-	fn to_string_encoded(&self, encoder:IniValueEncoder) -> String {
-		format!("{}{}{}\n{}", CATEGORY_CHARS[0], self.name, CATEGORY_CHARS[1], self.data.iter().filter(|variable| variable.is_ok()).map(|variable| variable.to_string_encoded(encoder)).collect::<Vec<String>>().join("\n"))
+	fn to_string_encoded(&self, encoder:IniValueEncoder, decoder:IniValueDecoder) -> String {
+		format!("{}{}{}\n{}", CATEGORY_CHARS[0], self.name, CATEGORY_CHARS[1], self.data.iter().filter(|variable| variable.is_ok()).map(|variable| variable.to_string_encoded(encoder, decoder)).collect::<Vec<String>>().join("\n"))
 	}
 }
 impl Index<&str> for IniCategory {
@@ -231,7 +234,7 @@ impl IniVariable {
 	}
 
 	/// Encode values and parse to string.
-	fn to_string_encoded(&self, encoder:IniValueEncoder) -> String {
-		format!("{}{}{}", self.name, VARIABLE_SPLIT_CHAR, encoder(&self.value))
+	fn to_string_encoded(&self, encoder:IniValueEncoder, decoder:IniValueDecoder) -> String {
+		format!("{}{}{}", self.name, VARIABLE_SPLIT_CHAR, encoder(&decoder(&self.value)))
 	}
 }
