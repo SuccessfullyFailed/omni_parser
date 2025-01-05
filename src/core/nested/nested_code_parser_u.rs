@@ -69,6 +69,8 @@ mod tests {
 		assert_eq!(results[0].depth(), 0);
 		assert_eq!(results.iter().filter(|code| code.type_name() == "if-statement").count(), 2);
 		assert_eq!(results.iter().filter(|code| code.type_name() == "print-statement").count(), 1);
+		assert!(results.iter().find(|code| code.contents().contains("let thing_result = do_the_thing();")).is_some());
+		assert_eq!(results.iter().map(|result| result.contents()).collect::<Vec<&str>>().join(""), EXAMPLE_TEXT);
 	}
 
 	#[test]
