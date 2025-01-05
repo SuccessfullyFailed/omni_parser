@@ -45,6 +45,20 @@ impl IniCore {
 
 
 
+	/* PROPERTY GETTER METHODS */
+
+	/// Get all categories.
+	pub fn categories(&self) -> &Vec<IniCategory> {
+		&self.data
+	}
+
+	/// Get a mutable reference all categories.
+	pub fn categories_mut(&mut self) -> &mut Vec<IniCategory> {
+		&mut self.data
+	}
+
+
+
 	/* USAGE METHODS */
 
 	/// Parse some contents to IniCategories.
@@ -65,8 +79,7 @@ impl IniCore {
 			// New category.
 			else if line.starts_with(CATEGORY_CHARS[0]) && line.ends_with(CATEGORY_CHARS[1]) {
 				if !variables.is_empty() {
-					categories.push(IniCategory::new(&current_category_name));
-					categories.last_mut().unwrap().data.extend_from_slice(&variables);
+					categories.push(IniCategory::new(&current_category_name, variables));
 				}
 				current_category_name = line[1..line.len() - 1].trim().to_string();
 				variables = Vec::new();
@@ -86,12 +99,17 @@ impl IniCore {
 			}
 		}
 
+		// Add trailing data.
+		if !variables.is_empty() {
+			categories.push(IniCategory::new(&current_category_name, variables));
+		}
+
 		// Return parsed categories.
 		Ok(categories)
 	}
 
 	/// Encode values and parse to string.
-	fn to_string_encoded_values(&self) -> String {
+	pub(super) fn to_string_encoded_values(&self) -> String {
 		self.data.iter().filter(|category| category.is_ok()).map(|category| category.to_string_encoded(self.encoder, self.decoder)).collect::<Vec<String>>().join("\n\n")
 	}
 
@@ -138,14 +156,21 @@ pub struct IniCategory {
 }
 impl IniCategory {
 
+	/* CONSTRUCTOR METHODS */
+
+	/// Create a new empty IniCategory.
+	pub fn empty(name:&str) -> IniCategory {
+		IniCategory::new(name, Vec::new())
+	}
+
 	/// Create a new IniCategory.
-	pub fn new(name:&str) -> IniCategory {
+	pub fn new(name:&str, variables:Vec<IniVariable>) -> IniCategory {
 		if name == UNAVAILABLE_PROPERTY_PLACEHOLDER {
 			panic!("'{UNAVAILABLE_PROPERTY_PLACEHOLDER}' should not be used for an ini category name. This string is reserved for incorrect property fetching.");
 		}
 		IniCategory {
 			name: name.to_string(),
-			data: Vec::new()
+			data: variables
 		}
 	}
 
@@ -163,13 +188,17 @@ impl IniCategory {
 		}
 	}
 
+
+
+	/* PROPERTY GETTER METHODS */
+
 	/// Check if the gotten variable is ok, not the error category.
 	pub fn is_ok(&self) -> bool {
-		self.name == UNAVAILABLE_PROPERTY_PLACEHOLDER && !self.data.is_empty()
+		self.name != UNAVAILABLE_PROPERTY_PLACEHOLDER && !self.data.is_empty()
 	}
 
 	/// Encode values and parse to string.
-	fn to_string_encoded(&self, encoder:IniValueEncoder, decoder:IniValueDecoder) -> String {
+	pub(super) fn to_string_encoded(&self, encoder:IniValueEncoder, decoder:IniValueDecoder) -> String {
 		format!("{}{}{}\n{}", CATEGORY_CHARS[0], self.name, CATEGORY_CHARS[1], self.data.iter().filter(|variable| variable.is_ok()).map(|variable| variable.to_string_encoded(encoder, decoder)).collect::<Vec<String>>().join("\n"))
 	}
 }
@@ -202,6 +231,8 @@ pub struct IniVariable {
 	pub value:String
 }
 impl IniVariable {
+	
+	/* CONSTRUCTOR METHODS */
 
 	/// Create a new IniVariable.
 	pub fn new(name:&str, value:&str) -> IniVariable {
@@ -228,13 +259,17 @@ impl IniVariable {
 		}
 	}
 
+
+
+	/* PROPERTY GETTER METHODS */
+
 	/// Check if the gotten variable is ok, not the error variable.
 	pub fn is_ok(&self) -> bool {
-		self.name == UNAVAILABLE_PROPERTY_PLACEHOLDER && !self.value.is_empty()
+		self.name != UNAVAILABLE_PROPERTY_PLACEHOLDER && !self.value.is_empty()
 	}
 
 	/// Encode values and parse to string.
-	fn to_string_encoded(&self, encoder:IniValueEncoder, decoder:IniValueDecoder) -> String {
+	pub(super) fn to_string_encoded(&self, encoder:IniValueEncoder, decoder:IniValueDecoder) -> String {
 		format!("{}{}{}", self.name, VARIABLE_SPLIT_CHAR, encoder(&decoder(&self.value)))
 	}
 }
