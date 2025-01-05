@@ -3,7 +3,7 @@ name: Update No-Build-Script Branch
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   update_no_build_script:
@@ -26,10 +26,10 @@ jobs:
           git fetch origin no-build-script || true
           git checkout no-build-script || git checkout -b no-build-script
 
-      # Sync changes from main branch
-      - name: Merge changes from main
+      # Sync changes from master branch
+      - name: Merge changes from master
         run: |
-          git merge origin/main --no-edit
+          git merge origin/master --no-edit --allow-unrelated-histories
 
       # Remove or modify build.rs
       - name: Remove build.rs
