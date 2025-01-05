@@ -78,11 +78,8 @@ impl NestedCodeParser {
 					if let Some(match_length) = self.tag_matches_contents(&contents, cursor, identification_set.close(), &identification_set.close_escape()) {
 						results.last_mut().unwrap().set_end(cursor + match_length);
 						last_unmatched_cursor = cursor + match_length;
-						found_anything = true;
+						depth.remove(depth.len() - 1);
 					}
-				}
-				if found_anything {
-					depth.remove(depth.len() - 1);
 				}
 			}
 
@@ -152,8 +149,8 @@ impl NestedCodeParser {
 	}
 
 	/// Check if a specific tag matches a specific place in contents. Returns the length of the match.
-	fn tag_matches_contents(&self, contents:&str, cursor:usize, tag:&str, escape:&Option<String>) -> Option<usize> {
-		if self.match_any_white_space && tag.chars().all(|character| character.is_whitespace()) {
+	pub(crate) fn tag_matches_contents(&self, contents:&str, cursor:usize, tag:&str, escape:&Option<String>) -> Option<usize> {
+		if self.match_any_white_space {
 			self.tag_matches_contents_whitespace_irrelevant(contents, cursor, tag, escape)
 		} else {
 			self.tag_matches_contents_simple(contents, cursor, tag, escape)
@@ -177,11 +174,27 @@ impl NestedCodeParser {
 
 	/// Check if a specific tag matches a specific place in contents by simply checking if the strings are the same. Returns the length of the match.
 	fn tag_matches_contents_whitespace_irrelevant(&self, contents:&str, cursor:usize, tag:&str, escape:&Option<String>) -> Option<usize> {
-		
-		// Keep comparing contents to tag at indexes.
 		let contents_chars:Vec<char> = contents[cursor..].chars().collect::<Vec<char>>();
 		let tag_chars:Vec<char> = tag.chars().collect();
-		let mut indexes:[usize; 2] = [cursor, 0];
+
+		// If tag is all white-space, simply check if the next white-space contains all tag chars.
+		if tag_chars.iter().all(|char| char.is_whitespace()) {
+			let mut tag_char_index:usize = 0;
+			for (character_index, character) in contents_chars.iter().enumerate() {
+				if !character.is_whitespace() {
+					break;
+				}
+				if character == &tag_chars[tag_char_index] {
+					tag_char_index += 1;
+					if tag_char_index >= tag_chars.len() {
+						return Some(character_index);
+					}
+				}
+			}
+		}
+		
+		// Keep comparing contents to tag at indexes.
+		let mut indexes:[usize; 2] = [0, 0];
 		while indexes[0] < contents_chars.len() && indexes[1] < tag_chars.len() {
 
 			// Skip over white-space.
