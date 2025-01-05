@@ -60,7 +60,7 @@ impl NestedCodeParser {
 			if allow_sub_parse {
 				for identification_set in &self.identification {
 					if !found_anything && self.tag_matches_contents(&contents, cursor, identification_set.open(), identification_set.open_escape()).is_some() {
-						if self.include_unmatched && depth.is_empty() && last_unmatched_cursor != cursor {
+						if self.include_unmatched && last_unmatched_cursor != cursor {
 							results.push(NestedCode::new(&contents, last_unmatched_cursor..cursor, 0, UNMATCHED_SEGMENT_NAME));
 							last_unmatched_cursor = cursor;
 						}
