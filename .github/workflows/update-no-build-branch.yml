@@ -29,7 +29,7 @@ jobs:
       # Sync changes from master branch
       - name: Merge changes from master
         run: |
-          git merge origin/master --no-edit --allow-unrelated-histories
+          git merge origin/master --no-edit --allow-unrelated-histories --strategy=recursive --strategy-option=theirs
 
       # Remove or modify build.rs
       - name: Remove build.rs
