@@ -36,6 +36,8 @@ jobs:
         run: |
           rm -f build.rs
           git add -u
+          sed -i '/^\[build-dependencies\]/,/^$/d' Cargo.toml
+          git add Cargo.toml
           git commit -m "Remove build.rs for no-build-script branch" || echo "No changes to commit"
 
       # Push changes to the no-build-script branch
