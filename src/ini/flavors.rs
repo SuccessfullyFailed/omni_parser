@@ -1,14 +1,14 @@
-use crate::implement_ini_lang;
+use crate::create_ini_flavor;
 
 
 
-implement_ini_lang!(
+create_ini_flavor!(
 	Ini,
 	&|value| value.to_owned(),
 	&|value| value.to_owned()
 );
 
-implement_ini_lang!(
+create_ini_flavor!(
 	Toml,
 	&|value| {
 		let no_quote_required:bool = value.parse::<bool>().is_ok() || value.parse::<u64>().is_ok() || value.parse::<f64>().is_ok() || (value.trim().starts_with('{') && value.trim().ends_with('}')) || (value.trim().starts_with('[') && value.trim().ends_with(']'));

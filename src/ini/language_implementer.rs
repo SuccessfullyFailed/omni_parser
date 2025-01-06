@@ -1,5 +1,5 @@
 #[macro_export]
-macro_rules! implement_ini_lang {
+macro_rules! create_ini_flavor {
 	($type_name:ident, $encoder:expr, $decoder:expr) => {
 		pub struct $type_name(pub crate::IniCore);
 		impl $type_name {
