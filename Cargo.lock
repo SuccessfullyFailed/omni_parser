@@ -26,7 +26,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "file_ref"
 version = "0.1.0"
-source = "git+https://github.com/SuccessfullyFailed/file_ref.git#f433b36e7f99203e3861e2fa3dd47106c1fa79d1"
+source = "git+https://github.com/SuccessfullyFailed/file_ref.git#2cab07da9c0cc360c551dea2cf5712e1d3734207"
 dependencies = [
  "unit_test_support",
 ]
@@ -45,7 +45,7 @@ dependencies = [
 [[package]]
 name = "lib_export_generator"
 version = "0.1.0"
-source = "git+https://github.com/SuccessfullyFailed/lib_export_generator.git#8afeaac4958b5c441ce6cdaf295184289dad7aec"
+source = "git+https://github.com/SuccessfullyFailed/lib_export_generator.git#d78dbf82ae8fce74eb33ddd9bb5eaf32ae14708e"
 dependencies = [
  "file_ref",
  "omni_parser 0.1.0 (git+https://github.com/SuccessfullyFailed/omni_parser.git?branch=no-build-script)",
@@ -75,7 +75,7 @@ dependencies = [
 [[package]]
 name = "omni_parser"
 version = "0.1.0"
-source = "git+https://github.com/SuccessfullyFailed/omni_parser.git?branch=no-build-script#04c47903657b428bca2c97e7f81c8e44a86a085e"
+source = "git+https://github.com/SuccessfullyFailed/omni_parser.git?branch=no-build-script#e8e04e58401a577e332e54530d228957f4956a3e"
 dependencies = [
  "file_ref",
 ]
@@ -168,9 +168,9 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "syn"
-version = "2.0.94"
+version = "2.0.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "987bc0be1cdea8b10216bd06e2ca407d40b9543468fafd3ddfb02f36e77f71f3"
+checksum = "46f71c0377baf4ef1cc3e3402ded576dccc315800fbc62dfc7fe04b009773b4a"
 dependencies = [
  "proc-macro2",
  "quote",
