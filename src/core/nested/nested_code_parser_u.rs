@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-	use crate::{ NestedCode, NestedCodeParser, UNMATCHED_NAME };
+	use crate::{ NestedCode, NestedCodeParser, ROOT_NAME, UNMATCHED_NAME, UNMATCHED_WHITESPACE_NAME };
 
 	/* HELPER FUNCTIONS */
 
@@ -35,19 +35,25 @@ mod tests {
 		let result:NestedCode = parser.parse(EXAMPLE_TEXT).unwrap();
 		println!("{:?}", result);
 		
-		assert_eq!(result.children().len(), 3);
-		assert_eq!(result[0].type_name(), "if-statement");
-		assert_eq!(result[1].type_name(), "scope");
-		assert_eq!(result[1][0].type_name(), "comment");
-		assert_eq!(result[1][1].type_name(), "if-statement");
-		assert_eq!(result[1][2].type_name(), "scope");
-		assert_eq!(result[1][2][0].type_name(), "print-statement");
-		assert_eq!(result[1][2][0][0].type_name(), "string");
+		assert_eq!(result.contents().len(), 5);
+		assert_eq!(result[0].type_name(), UNMATCHED_WHITESPACE_NAME);
+		assert_eq!(result[1].type_name(), "if-statement");
 		assert_eq!(result[2].type_name(), "scope");
-		assert_eq!(result[2][0].type_name(), "comment");
+		assert_eq!(result[2][0].type_name(), UNMATCHED_WHITESPACE_NAME);
+		assert_eq!(result[2][1].type_name(), "comment");
+		assert_eq!(result[2][2].type_name(), UNMATCHED_NAME);
+		assert_eq!(result[2][3].type_name(), "if-statement");
+		assert_eq!(result[2][4].type_name(), "scope");
+		assert_eq!(result[2][4][0].type_name(), UNMATCHED_WHITESPACE_NAME);
+		assert_eq!(result[2][4][1].type_name(), "print-statement");
+		assert_eq!(result[2][4][1][0].type_name(), "string");
+		assert_eq!(result[3].type_name(), UNMATCHED_NAME);
+		assert_eq!(result[4].type_name(), "scope");
+		assert_eq!(result[4][0].type_name(), UNMATCHED_WHITESPACE_NAME);
+		assert_eq!(result[4][1].type_name(), "comment");
 		assert_eq!(
 		 	result.flatten().iter().map(|(_, code)| code.type_name()).collect::<Vec<&str>>(),
-			vec![UNMATCHED_NAME, "if-statement", "scope", "comment", "if-statement", "scope", "print-statement", "string", "scope", "comment"]
+			vec![ROOT_NAME, UNMATCHED_WHITESPACE_NAME, "if-statement", "scope", UNMATCHED_WHITESPACE_NAME, "comment", UNMATCHED_NAME, "if-statement", "scope", UNMATCHED_WHITESPACE_NAME, "print-statement", "string", UNMATCHED_NAME, "scope", UNMATCHED_WHITESPACE_NAME, "comment"]
 		);
 	}
 
@@ -57,20 +63,26 @@ mod tests {
 		let result:NestedCode = parser.parse(EXAMPLE_TEXT).unwrap();
 		println!("{:?}", result);
 		
-		assert_eq!(result.children().len(), 4);
-		assert_eq!(result[0].type_name(), "if-statement");
-		assert_eq!(result[1].type_name(), "scope");
-		assert_eq!(result[1][0].type_name(), "comment");
-		assert_eq!(result[1][1].type_name(), "if-statement");
-		assert_eq!(result[1][2].type_name(), "scope");
-		assert_eq!(result[1][2][0].type_name(), "print-statement");
-		assert_eq!(result[1][2][0][0].type_name(), "string");
-		assert_eq!(result[2].type_name(), "if-statement");
-		assert_eq!(result[3].type_name(), "scope");
-		assert_eq!(result[3][0].type_name(), "comment");
+		assert_eq!(result.contents().len(), 6);
+		assert_eq!(result[0].type_name(), UNMATCHED_WHITESPACE_NAME);
+		assert_eq!(result[1].type_name(), "if-statement");
+		assert_eq!(result[2].type_name(), "scope");
+		assert_eq!(result[2][0].type_name(), UNMATCHED_WHITESPACE_NAME);
+		assert_eq!(result[2][1].type_name(), "comment");
+		assert_eq!(result[2][2].type_name(), UNMATCHED_NAME);
+		assert_eq!(result[2][3].type_name(), "if-statement");
+		assert_eq!(result[2][4].type_name(), "scope");
+		assert_eq!(result[2][4][0].type_name(), UNMATCHED_WHITESPACE_NAME);
+		assert_eq!(result[2][4][1].type_name(), "print-statement");
+		assert_eq!(result[2][4][1][0].type_name(), "string");
+		assert_eq!(result[3].type_name(), UNMATCHED_WHITESPACE_NAME);
+		assert_eq!(result[4].type_name(), "if-statement");
+		assert_eq!(result[5].type_name(), "scope");
+		assert_eq!(result[5][0].type_name(), UNMATCHED_WHITESPACE_NAME);
+		assert_eq!(result[5][1].type_name(), "comment");
 		assert_eq!(
-			result.flatten().iter().map(|(_, code)| code.type_name()).collect::<Vec<&str>>(),
-			vec![UNMATCHED_NAME, "if-statement", "scope", "comment", "if-statement", "scope", "print-statement", "string", "if-statement", "scope", "comment"]
+		 	result.flatten().iter().map(|(_, code)| code.type_name()).collect::<Vec<&str>>(),
+			vec![ROOT_NAME, UNMATCHED_WHITESPACE_NAME, "if-statement", "scope", UNMATCHED_WHITESPACE_NAME, "comment", UNMATCHED_NAME, "if-statement", "scope", UNMATCHED_WHITESPACE_NAME, "print-statement", "string", UNMATCHED_WHITESPACE_NAME, "if-statement", "scope", UNMATCHED_WHITESPACE_NAME, "comment"]
 		);
 	}
 }
