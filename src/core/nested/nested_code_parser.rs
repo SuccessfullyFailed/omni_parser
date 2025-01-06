@@ -76,6 +76,9 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 			// Try to match closing tag.
 			if let Some((open_tag_location, target_identification)) = &scope_terminator {
 				if let Some(match_length) = self.cursor_matches_tag(&target_identification.close, &target_identification.close_escape) {
+					if let Some(from_unmatched) = self.code_from_unmatched() {
+						children.push(from_unmatched);
+					}
 					let start:usize = self.cursor;
 					self.cursor += match_length;
 					self.unmatched_cursor = self.cursor;
@@ -88,15 +91,9 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 			if allow_recurse {
 				for identification_set in &self.origin.identification {
 					if let Some(match_length) = self.cursor_matches_tag(&identification_set.open, &identification_set.open_escape) {
-
-						// Create snippet from unmatched code.
-						if self.unmatched_cursor != self.cursor {
-							let contents:&[char] = &self.contents[self.unmatched_cursor..self.cursor];
-							let name:&str = if contents.iter().all(|character| character.is_whitespace()) { UNMATCHED_WHITESPACE_NAME } else { UNMATCHED_NAME };
-							children.push(NestedCode::new(name, false, contents, &self.contents[self.cursor..self.cursor], Vec::new()));
+						if let Some(from_unmatched) = self.code_from_unmatched() {
+							children.push(from_unmatched);
 						}
-
-						// Create snippet from match.
 						let start:usize = self.cursor;
 						self.cursor += match_length;
 						self.unmatched_cursor = self.cursor;
@@ -115,7 +112,21 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 			let line_break_locations:Vec<usize> = self.contents[..open_tag_location.start].iter().enumerate().filter(|(_, character)| **character == '\n' || **character == '\r').map(|(index, _)| index).collect::<Vec<usize>>();
 			Err(format!("Could not find end of {} starting at {}:{}", &target_identification.name, line_break_locations.len(), open_tag_location.start - line_break_locations.last().unwrap_or(&0)).into())
 		} else {
+			if let Some(from_unmatched) = self.code_from_unmatched() {
+				children.push(from_unmatched);
+			}
 			Ok(NestedCode::new(ROOT_NAME, false, &[], &[], children))
+		}
+	}
+
+	/// Create a snippet from unmatched code at the cursor.
+	fn code_from_unmatched(&self) -> Option<NestedCode> {
+		if self.unmatched_cursor != self.cursor {
+			let contents:&[char] = &self.contents[self.unmatched_cursor..self.cursor];
+			let name:&str = if contents.iter().all(|character| character.is_whitespace()) { UNMATCHED_WHITESPACE_NAME } else { UNMATCHED_NAME };
+			Some(NestedCode::new(name, false, contents, &self.contents[self.cursor..self.cursor], Vec::new()))
+		} else {
+			None
 		}
 	}
 
