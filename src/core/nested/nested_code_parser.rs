@@ -115,7 +115,7 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 			let line_break_locations:Vec<usize> = self.contents[..open_tag_location.start].iter().enumerate().filter(|(_, character)| **character == '\n' || **character == '\r').map(|(index, _)| index).collect::<Vec<usize>>();
 			Err(format!("Could not find end of {} starting at {}:{}", &target_identification.name, line_break_locations.len(), open_tag_location.start - line_break_locations.last().unwrap_or(&0)).into())
 		} else {
-			Ok(NestedCode::new(ROOT_NAME, true, &[], &[], children))
+			Ok(NestedCode::new(ROOT_NAME, false, &[], &[], children))
 		}
 	}
 
