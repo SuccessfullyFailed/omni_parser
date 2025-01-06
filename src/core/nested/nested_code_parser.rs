@@ -3,7 +3,9 @@ use std::{ error::Error, ops::Range };
 
 
 
+pub const ROOT_NAME:&str = "ROOT";
 pub const UNMATCHED_NAME:&str = "UNMATCHED";
+pub const UNMATCHED_WHITESPACE_NAME:&str = "UNMATCHED_WHITESPACE";
 
 
 
@@ -45,7 +47,8 @@ impl NestedCodeParser {
 pub struct InnerNestedCodeParser<'a> {
 	origin:&'a NestedCodeParser,
 	contents:Vec<char>,
-	cursor:usize
+	cursor:usize,
+	unmatched_cursor:usize
 }
 impl<'a, 'b> InnerNestedCodeParser<'a> {
 	
@@ -56,7 +59,8 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 		InnerNestedCodeParser {
 			origin,
 			contents: contents.chars().collect(),
-			cursor: 0
+			cursor: 0,
+			unmatched_cursor: 0
 		}
 	}
 
@@ -74,7 +78,8 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 				if let Some(match_length) = self.cursor_matches_tag(&target_identification.close, &target_identification.close_escape) {
 					let start:usize = self.cursor;
 					self.cursor += match_length;
-					return Ok(NestedCode::new(&target_identification.name, open_tag_location.clone(), start..self.cursor, &self.contents, children));
+					self.unmatched_cursor = self.cursor;
+					return Ok(NestedCode::new(&target_identification.name, true, &self.contents[open_tag_location.clone()], &self.contents[start..self.cursor], children));
 				}
 			}
 
@@ -83,8 +88,18 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 			if allow_recurse {
 				for identification_set in &self.origin.identification {
 					if let Some(match_length) = self.cursor_matches_tag(&identification_set.open, &identification_set.open_escape) {
+
+						// Create snippet from unmatched code.
+						if self.unmatched_cursor != self.cursor {
+							let contents:&[char] = &self.contents[self.unmatched_cursor..self.cursor];
+							let name:&str = if contents.iter().all(|character| character.is_whitespace()) { UNMATCHED_WHITESPACE_NAME } else { UNMATCHED_NAME };
+							children.push(NestedCode::new(name, false, contents, &self.contents[self.cursor..self.cursor], Vec::new()));
+						}
+
+						// Create snippet from match.
 						let start:usize = self.cursor;
 						self.cursor += match_length;
+						self.unmatched_cursor = self.cursor;
 						children.push(self.parse(Some((start..self.cursor, &identification_set)))?);
 						self.cursor -= 1; // The cursor loop is not broken, so the cursor will be incremented in the end of the loop.
 						break;
@@ -100,7 +115,7 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 			let line_break_locations:Vec<usize> = self.contents[..open_tag_location.start].iter().enumerate().filter(|(_, character)| **character == '\n' || **character == '\r').map(|(index, _)| index).collect::<Vec<usize>>();
 			Err(format!("Could not find end of {} starting at {}:{}", &target_identification.name, line_break_locations.len(), open_tag_location.start - line_break_locations.last().unwrap_or(&0)).into())
 		} else {
-			Ok(NestedCode::new(UNMATCHED_NAME, 0..0, self.cursor..self.cursor, &self.contents, children))
+			Ok(NestedCode::new(ROOT_NAME, true, &[], &[], children))
 		}
 	}
 
