@@ -7,4 +7,4 @@ edition = "2021"
 file_ref={ git="https://github.com/SuccessfullyFailed/file_ref.git" }
 
 [build-dependencies]
-lib_export_generator={ git="https://github.com/SuccessfullyFailed/lib_export_generator.git" }
+crate_manager={ git="https://github.com/SuccessfullyFailed/crate_manager.git" }
