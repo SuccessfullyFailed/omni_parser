@@ -136,7 +136,7 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 				return None;
 			}
 			let name:&str = if is_white_space { UNMATCHED_WHITESPACE_NAME } else { UNMATCHED_NAME };
-			Some(NestedCode::new(name, false, contents, &self.contents[self.cursor..self.cursor], Vec::new()))
+			Some(NestedCode::new(name, false, contents, &[], Vec::new()))
 		} else {
 			None
 		}
