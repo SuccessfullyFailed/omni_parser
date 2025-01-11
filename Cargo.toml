@@ -6,5 +6,3 @@ edition = "2021"
 [dependencies]
 file_ref={ git="https://github.com/SuccessfullyFailed/file_ref.git" }
 
-[build-dependencies]
-crate_manager={ git="https://github.com/SuccessfullyFailed/crate_manager.git" }
