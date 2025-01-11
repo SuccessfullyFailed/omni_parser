@@ -12,7 +12,8 @@ pub const UNMATCHED_WHITESPACE_NAME:&str = "UNMATCHED_WHITESPACE";
 #[derive(Clone)]
 pub struct NestedCodeParser {
 	identification:Vec<SegmentIdentification>,
-	match_any_white_space:bool
+	match_any_white_space:bool,
+	ignore_white_space_segments:bool
 }
 impl NestedCodeParser {
 	
@@ -22,13 +23,20 @@ impl NestedCodeParser {
 	pub fn new(identification:Vec<&dyn SegmentIdentificationSource>) -> NestedCodeParser {
 		NestedCodeParser {
 			identification: identification.iter().map(|id_source| id_source.to_identification()).collect::<Vec<SegmentIdentification>>(),
-			match_any_white_space: false
+			match_any_white_space: false,
+			ignore_white_space_segments: false
 		}
 	}
 
 	/// Return a version of self that, when matching strings, matches any white-spaces equally.
 	pub fn match_any_white_space(mut self) -> Self {
 		self.match_any_white_space = true;
+		self
+	}
+
+	/// Return a version of self that will not add segments that are only white-space.
+	pub fn ignore_white_space_segments(mut self) -> Self {
+		self.ignore_white_space_segments = true;
 		self
 	}
 	
@@ -123,7 +131,11 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 	fn code_from_unmatched(&self) -> Option<NestedCode> {
 		if self.unmatched_cursor != self.cursor {
 			let contents:&[char] = &self.contents[self.unmatched_cursor..self.cursor];
-			let name:&str = if contents.iter().all(|character| character.is_whitespace()) { UNMATCHED_WHITESPACE_NAME } else { UNMATCHED_NAME };
+			let is_white_space:bool = contents.iter().all(|character| character.is_whitespace());
+			if is_white_space && self.origin.ignore_white_space_segments {
+				return None;
+			}
+			let name:&str = if is_white_space { UNMATCHED_WHITESPACE_NAME } else { UNMATCHED_NAME };
 			Some(NestedCode::new(name, false, contents, &self.contents[self.cursor..self.cursor], Vec::new()))
 		} else {
 			None
