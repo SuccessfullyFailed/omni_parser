@@ -55,7 +55,11 @@ impl NestedCode {
 
 	/// Get the contents.
 	pub fn contents_joined(&self) -> String {
-		self.contents.iter().map(|child| format!("{}{}{}", child.open_tag, child.contents_joined(), child.close_tag)).collect::<Vec<String>>().join("")
+		[
+			self.open_tag.clone(),
+			self.contents.iter().map(|child| child.contents_joined()).collect::<Vec<String>>().join(""),
+			self.close_tag.clone()
+		].join("")
 	}
 
 	/// Get a flat list of self and all children and their depth.
