@@ -1,5 +1,5 @@
 use super::{ MatchMethod, LazyMatchSource, NestedCodeSegment, SegmentIdentification };
-use std::{ error::Error, ops::Range };
+use std::ops::Range;
 
 
 
@@ -36,7 +36,7 @@ impl NestedCodeParser {
 	/* USAGE METHODS */
 
 	/// Parse some code.
-	pub fn parse<'b>(&self, contents:&'b str) -> Result<NestedCodeSegment, Box<dyn Error>> {
+	pub fn parse<'b>(&self, contents:&'b str) -> NestedCodeSegment {
 		let mut parser:InnerNestedCodeParser<'_, 'b> = InnerNestedCodeParser::new(self, contents);
 		parser.parse(None)
 	}
@@ -69,7 +69,7 @@ impl<'a, 'b> InnerNestedCodeParser<'a, 'b> {
 	/* USAGE METHODS */
 
 	/// Parse one single code snippet.
-	fn parse(&mut self, scope_terminator:Option<(Range<usize>, &SegmentIdentification)>) -> Result<NestedCodeSegment, Box<dyn Error>> {
+	fn parse(&mut self, scope_terminator:Option<(Range<usize>, &SegmentIdentification)>) -> NestedCodeSegment {
 		let mut children:Vec<NestedCodeSegment> = Vec::new();
 		while self.cursor < self.contents.len() {
 			
@@ -82,7 +82,7 @@ impl<'a, 'b> InnerNestedCodeParser<'a, 'b> {
 					let start:usize = self.cursor;
 					self.cursor += match_length;
 					self.unmatched_cursor = self.cursor;
-					return Ok(NestedCodeSegment::new(&target_identification.name, true, self.contents, open_tag_location.clone(), start..self.cursor, children));
+					return NestedCodeSegment::new(&target_identification.name, true, self.contents, open_tag_location.clone(), start..self.cursor, children);
 				}
 			}
 
@@ -97,7 +97,7 @@ impl<'a, 'b> InnerNestedCodeParser<'a, 'b> {
 						let start:usize = self.cursor;
 						self.cursor += match_length;
 						self.unmatched_cursor = self.cursor;
-						children.push(self.parse(Some((start..self.cursor, &identification_set)))?);
+						children.push(self.parse(Some((start..self.cursor, &identification_set))));
 						self.cursor -= 1; // The cursor loop is not broken, so the cursor will be incremented in the end of the loop.
 						break;
 					}
@@ -107,16 +107,16 @@ impl<'a, 'b> InnerNestedCodeParser<'a, 'b> {
 			self.cursor += 1;
 		}
 
-		// Target end not found.
+		// If target end not found, consider end of string the end of the tag.
 		if let Some((open_tag_location, target_identification)) = scope_terminator {
-			let line_break_locations:Vec<usize> = self.contents[..open_tag_location.start].chars().enumerate().filter(|(_, character)| *character == '\n' || *character == '\r').map(|(index, _)| index).collect::<Vec<usize>>();
-			Err(format!("Could not find end of {} starting at {}:{}", &target_identification.name, line_break_locations.len(), open_tag_location.start - line_break_locations.last().unwrap_or(&0)).into())
-		} else {
-			if let Some(from_unmatched) = self.code_from_unmatched() {
-				children.push(from_unmatched);
-			}
-			Ok(NestedCodeSegment::new(ROOT_NAME, false, &self.contents, 0..self.contents.len(), 0..self.contents.len(), children))
+			return NestedCodeSegment::new(&target_identification.name, true, self.contents, open_tag_location.clone(), self.unmatched_cursor..self.cursor, children);
 		}
+		
+		// No active expected end meant this is the root element.
+		if let Some(from_unmatched) = self.code_from_unmatched() {
+			children.push(from_unmatched);
+		}
+		NestedCodeSegment::new(ROOT_NAME, false, &self.contents, 0..self.contents.len(), 0..self.contents.len(), children)
 	}
 
 	/// Create a snippet from unmatched code at the cursor.
