@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-	use crate::{ NestedCode, NestedCodeParser, ROOT_NAME, UNMATCHED_NAME, UNMATCHED_WHITESPACE_NAME };
+	use crate::{ NestedCodeSegment, NestedCodeParser, ROOT_NAME, UNMATCHED_NAME, UNMATCHED_WHITESPACE_NAME };
 
 	/* HELPER FUNCTIONS */
 
@@ -33,10 +33,10 @@ mod tests {
 	#[test]
 	fn test_nesting_structure() {
 		let parser:NestedCodeParser = example_parser();
-		let result:NestedCode = parser.parse(EXAMPLE_TEXT).unwrap();
+		let result:NestedCodeSegment = parser.parse(EXAMPLE_TEXT).unwrap();
 		println!("{:?}", result);
 		
-		assert_eq!(result.contents().len(), 6);
+		assert_eq!(result.sub_segments().len(), 6);
 		assert_eq!(result[0].type_name(), UNMATCHED_WHITESPACE_NAME);
 		assert_eq!(result[1].type_name(), "if-statement");
 		assert_eq!(result[2].type_name(), "scope");
@@ -54,7 +54,7 @@ mod tests {
 		assert_eq!(result[4][1].type_name(), "comment");
 		assert_eq!(result[5].type_name(), UNMATCHED_NAME);
 		assert_eq!(
-		 	result.flatten().iter().map(|(_, code)| code.type_name()).collect::<Vec<&str>>(),
+		 	result.flat().iter().map(|(_, code)| code.type_name()).collect::<Vec<&str>>(),
 			vec![ROOT_NAME, UNMATCHED_WHITESPACE_NAME, "if-statement", UNMATCHED_NAME, "scope", UNMATCHED_WHITESPACE_NAME, "comment", UNMATCHED_NAME, UNMATCHED_NAME, "if-statement", UNMATCHED_NAME, "scope", UNMATCHED_WHITESPACE_NAME, "print-statement", "string", UNMATCHED_NAME, UNMATCHED_NAME, UNMATCHED_WHITESPACE_NAME, UNMATCHED_WHITESPACE_NAME, UNMATCHED_NAME, "scope", UNMATCHED_WHITESPACE_NAME, "comment", UNMATCHED_NAME, UNMATCHED_WHITESPACE_NAME, UNMATCHED_NAME]
 		);
 	}
@@ -62,10 +62,10 @@ mod tests {
 	#[test]
 	fn test_ignore_white_space_segments() {
 		let parser:NestedCodeParser = example_parser().ignore_white_space_segments();
-		let result:NestedCode = parser.parse(EXAMPLE_TEXT).unwrap();
+		let result:NestedCodeSegment = parser.parse(EXAMPLE_TEXT).unwrap();
 		println!("{:?}", result);
 		
-		assert_eq!(result.contents().len(), 5);
+		assert_eq!(result.sub_segments().len(), 5);
 		assert_eq!(result[0].type_name(), "if-statement");
 		assert_eq!(result[1].type_name(), "scope");
 		assert_eq!(result[1][0].type_name(), "comment");
@@ -79,7 +79,7 @@ mod tests {
 		assert_eq!(result[3][0].type_name(), "comment");
 		assert_eq!(result[4].type_name(), UNMATCHED_NAME);
 		assert_eq!(
-		 	result.flatten().iter().map(|(_, code)| code.type_name()).collect::<Vec<&str>>(),
+		 	result.flat().iter().map(|(_, code)| code.type_name()).collect::<Vec<&str>>(),
 			vec![ROOT_NAME, "if-statement", UNMATCHED_NAME, "scope", "comment", UNMATCHED_NAME, UNMATCHED_NAME, "if-statement", UNMATCHED_NAME, "scope", "print-statement", "string", UNMATCHED_NAME, UNMATCHED_NAME, UNMATCHED_NAME, "scope", "comment", UNMATCHED_NAME, UNMATCHED_NAME]
 		);
 	}
@@ -87,10 +87,10 @@ mod tests {
 	#[test]
 	fn test_double_escape() {
 		let parser:NestedCodeParser = example_parser();
-		assert_eq!(parser.parse(r#"- "test" -"#).unwrap().contents()[1].contents_joined(), r#""test""#);
-		assert_eq!(parser.parse(r#"- "test\"" -"#).unwrap().contents()[1].contents_joined(), r#""test\"""#);
-		assert_eq!(parser.parse(r#"- "test\\" -"#).unwrap().contents()[1].contents_joined(), r#""test\\""#);
-		assert_eq!(parser.parse(r#"- "test\\\"" -"#).unwrap().contents()[1].contents_joined(), r#""test\\\"""#);
+		assert_eq!(parser.parse(r#"- "test" -"#).unwrap().sub_segments()[1].outer_contents(), r#""test""#);
+		assert_eq!(parser.parse(r#"- "test\"" -"#).unwrap().sub_segments()[1].outer_contents(), r#""test\"""#);
+		assert_eq!(parser.parse(r#"- "test\\" -"#).unwrap().sub_segments()[1].outer_contents(), r#""test\\""#);
+		assert_eq!(parser.parse(r#"- "test\\\"" -"#).unwrap().sub_segments()[1].outer_contents(), r#""test\\\"""#);
 	}
 
 	#[test]
@@ -98,18 +98,18 @@ mod tests {
 
 		// CharSet match.
 		let parser:NestedCodeParser = NestedCodeParser::new(vec![&("comment", false, "//", "\n")]);
-		assert_eq!(parser.parse("-- // test\n --").unwrap().contents()[1].contents_joined(), "// test\n");
+		assert_eq!(parser.parse("-- // test\n --").unwrap().sub_segments()[1].outer_contents(), "// test\n");
 		let parser:NestedCodeParser = NestedCodeParser::new(vec![&("comment", false, "//", Some("P"), "\n", Some("\\"))]);
-		assert_eq!(parser.parse("-- P// // test\\\n \n --").unwrap().contents()[1].contents_joined(), "// test\\\n \n");
+		assert_eq!(parser.parse("-- P// // test\\\n \n --").unwrap().sub_segments()[1].outer_contents(), "// test\\\n \n");
 
 		// Method match.
-		const OPEN:&'static dyn Fn(&[char]) -> Option<usize> = &|contents:&[char]| if contents[0] == '/' && contents[1] == '/' { Some(2) } else { None };
-		const CLOSE:&'static dyn Fn(&[char]) -> Option<usize> = &|contents:&[char]| if contents[0] == '\n' { Some(1) } else { None };
+		const OPEN:&'static dyn Fn(&str) -> Option<usize> = &|contents| if contents.len() >= 2 && &contents[..2] == "//" { Some(2) } else { None };
+		const CLOSE:&'static dyn Fn(&str) -> Option<usize> = &|contents| if contents.len() >= 1 && &contents[..1] == "\n" { Some(1) } else { None };
 		let parser:NestedCodeParser = NestedCodeParser::new(vec![&("comment", false, OPEN, CLOSE)]);
-		assert_eq!(parser.parse("-- // test\n --").unwrap().contents()[1].contents_joined(), "// test\n");
+		assert_eq!(parser.parse("-- // test\n --").unwrap().sub_segments()[1].outer_contents(), "// test\n");
 
 		// Regex match.
 		let parser:NestedCodeParser = NestedCodeParser::new(vec![&("comment", "^//.+\n")]);
-		assert_eq!(parser.parse("-- // test\n --").unwrap().contents()[1].contents_joined(), "// test\n");
+		assert_eq!(parser.parse("-- // test\n --").unwrap().sub_segments()[1].outer_contents(), "// test\n");
 	}
 }

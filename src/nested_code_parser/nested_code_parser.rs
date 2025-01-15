@@ -1,4 +1,4 @@
-use super::{ MatchMethod, MatchMethodSource, NestedCode, SegmentIdentification };
+use super::{ MatchMethod, LazyMatchSource, NestedCodeSegment, SegmentIdentification };
 use std::{ error::Error, ops::Range };
 
 
@@ -18,7 +18,7 @@ impl NestedCodeParser {
 	/* CONSTRUCTOR METHODS */
 
 	/// Create a new parser.
-	pub fn new(identification:Vec<&dyn MatchMethodSource>) -> NestedCodeParser {
+	pub fn new(identification:Vec<&dyn LazyMatchSource>) -> NestedCodeParser {
 		NestedCodeParser {
 			identification: identification.iter().map(|id_source| id_source.to_identification()).collect::<Vec<SegmentIdentification>>(),
 			ignore_white_space_segments: false
@@ -36,28 +36,29 @@ impl NestedCodeParser {
 	/* USAGE METHODS */
 
 	/// Parse some code.
-	pub fn parse(&self, contents:&str) -> Result<NestedCode, Box<dyn Error>> {
-		InnerNestedCodeParser::new(self, contents).parse(None)
+	pub fn parse<'b>(&self, contents:&'b str) -> Result<NestedCodeSegment, Box<dyn Error>> {
+		let mut parser:InnerNestedCodeParser<'_, 'b> = InnerNestedCodeParser::new(self, contents);
+		parser.parse(None)
 	}
 }
 
 
 
-pub struct InnerNestedCodeParser<'a> {
+pub struct InnerNestedCodeParser<'a, 'b> {
 	origin:&'a NestedCodeParser,
-	contents:Vec<char>,
+	contents:&'b str,
 	cursor:usize,
 	unmatched_cursor:usize
 }
-impl<'a, 'b> InnerNestedCodeParser<'a> {
+impl<'a, 'b> InnerNestedCodeParser<'a, 'b> {
 	
 	/* CONSTRUCTOR METHODS */
 
 	/// Create a new inner code parser.
-	pub fn new(origin:&'a NestedCodeParser, contents:&str) -> InnerNestedCodeParser<'a> {
+	pub fn new(origin:&'a NestedCodeParser, contents:&'b str) -> InnerNestedCodeParser<'a, 'b> {
 		InnerNestedCodeParser {
 			origin,
-			contents: contents.chars().collect(),
+			contents,
 			cursor: 0,
 			unmatched_cursor: 0
 		}
@@ -68,8 +69,8 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 	/* USAGE METHODS */
 
 	/// Parse one single code snippet.
-	fn parse(&mut self, scope_terminator:Option<(Range<usize>, &SegmentIdentification)>) -> Result<NestedCode, Box<dyn Error>> {
-		let mut children:Vec<NestedCode> = Vec::new();
+	fn parse(&mut self, scope_terminator:Option<(Range<usize>, &SegmentIdentification)>) -> Result<NestedCodeSegment, Box<dyn Error>> {
+		let mut children:Vec<NestedCodeSegment> = Vec::new();
 		while self.cursor < self.contents.len() {
 			
 			// Try to match closing tag.
@@ -81,7 +82,7 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 					let start:usize = self.cursor;
 					self.cursor += match_length;
 					self.unmatched_cursor = self.cursor;
-					return Ok(NestedCode::new(&target_identification.name, true, &self.contents[open_tag_location.clone()], &self.contents[start..self.cursor], children));
+					return Ok(NestedCodeSegment::new(&target_identification.name, true, self.contents, open_tag_location.clone(), start..self.cursor, children));
 				}
 			}
 
@@ -108,26 +109,26 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 
 		// Target end not found.
 		if let Some((open_tag_location, target_identification)) = scope_terminator {
-			let line_break_locations:Vec<usize> = self.contents[..open_tag_location.start].iter().enumerate().filter(|(_, character)| **character == '\n' || **character == '\r').map(|(index, _)| index).collect::<Vec<usize>>();
+			let line_break_locations:Vec<usize> = self.contents[..open_tag_location.start].chars().enumerate().filter(|(_, character)| *character == '\n' || *character == '\r').map(|(index, _)| index).collect::<Vec<usize>>();
 			Err(format!("Could not find end of {} starting at {}:{}", &target_identification.name, line_break_locations.len(), open_tag_location.start - line_break_locations.last().unwrap_or(&0)).into())
 		} else {
 			if let Some(from_unmatched) = self.code_from_unmatched() {
 				children.push(from_unmatched);
 			}
-			Ok(NestedCode::new(ROOT_NAME, false, &[], &[], children))
+			Ok(NestedCodeSegment::new(ROOT_NAME, false, &self.contents, 0..self.contents.len(), 0..self.contents.len(), children))
 		}
 	}
 
 	/// Create a snippet from unmatched code at the cursor.
-	fn code_from_unmatched(&self) -> Option<NestedCode> {
+	fn code_from_unmatched(&self) -> Option<NestedCodeSegment> {
 		if self.unmatched_cursor != self.cursor {
-			let contents:&[char] = &self.contents[self.unmatched_cursor..self.cursor];
-			let is_white_space:bool = contents.iter().all(|character| character.is_whitespace());
+			let unmatched_contents:&'b str = &self.contents[self.unmatched_cursor..self.cursor];
+			let is_white_space:bool = unmatched_contents.chars().all(|character| character.is_whitespace());
 			if is_white_space && self.origin.ignore_white_space_segments {
 				return None;
 			}
 			let name:&str = if is_white_space { UNMATCHED_WHITESPACE_NAME } else { UNMATCHED_NAME };
-			Some(NestedCode::new(name, false, contents, &[], Vec::new()))
+			Some(NestedCodeSegment::new(name, false, &self.contents, self.unmatched_cursor..self.unmatched_cursor, self.cursor..self.cursor, Vec::new()))
 		} else {
 			None
 		}
@@ -136,14 +137,14 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 	/// Checks wether or not the contents at the cursor match the given tag. Returns the length of the match in contents or None.
 	fn cursor_matches_tag(&self, matching_method:&MatchMethod) -> Option<usize> {
 		match matching_method {
-			MatchMethod::CharCompare(tag, escape) => self.cursor_matches_tag_literal(tag, escape),
+			MatchMethod::CharCompare(tag, escape) => self.cursor_matches_str_literal(tag, escape),
 			MatchMethod::Method(method)  => method(&self.contents[self.cursor..]),
-			MatchMethod::Regex(regex) => regex.captures(&self.contents[self.cursor..].iter().collect::<String>()).map(|regex_match| regex_match.get(0).map(|group| group.len()).unwrap_or_default())
+			MatchMethod::Regex(regex) => regex.captures(&self.contents[self.cursor..]).map(|regex_match| regex_match.get(0).map(|group| group.len()).unwrap_or_default())
 		}
 	}
 
 	/// Check if a specific tag matches a specific place in contents by simply checking if the strings are the same. Returns the length of the match.
-	fn cursor_matches_tag_literal(&self, tag:&[char], escape:&Option<Vec<char>>) -> Option<usize> {
+	fn cursor_matches_str_literal(&self, tag:&str, escape:&Option<String>) -> Option<usize> {
 		let tag_end:usize = self.cursor + tag.len();
 		if self.contents.len() >= tag_end && &self.contents[self.cursor..tag_end] == tag {
 			if let Some(escape) = escape {
