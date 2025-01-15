@@ -9,7 +9,6 @@ pub const UNMATCHED_WHITESPACE_NAME:&str = "UNMATCHED_WHITESPACE";
 
 
 
-#[derive(Clone)]
 pub struct NestedCodeParser {
 	identification:Vec<SegmentIdentification>,
 	ignore_white_space_segments:bool
@@ -137,7 +136,9 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 	/// Checks wether or not the contents at the cursor match the given tag. Returns the length of the match in contents or None.
 	fn cursor_matches_tag(&self, matching_method:&MatchMethod) -> Option<usize> {
 		match matching_method {
-			MatchMethod::CharCompare(tag, escape) => self.cursor_matches_tag_literal(tag, escape)
+			MatchMethod::CharCompare(tag, escape) => self.cursor_matches_tag_literal(tag, escape),
+			MatchMethod::Method(method)  => method(&self.contents[self.cursor..]),
+			MatchMethod::Regex(regex) => regex.captures(&self.contents[self.cursor..].iter().collect::<String>()).map(|regex_match| regex_match.get(0).map(|group| group.len()).unwrap_or_default())
 		}
 	}
 

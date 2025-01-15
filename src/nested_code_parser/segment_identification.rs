@@ -1,3 +1,5 @@
+use regex::Regex;
+
 #[derive(Clone)]
 pub struct SegmentIdentification {
 	pub(super) name:String,
@@ -24,7 +26,9 @@ impl SegmentIdentification {
 
 #[derive(Clone)]
 pub enum MatchMethod {
-	CharCompare(Vec<char>, Option<Vec<char>>)
+	CharCompare(Vec<char>, Option<Vec<char>>),
+	Method(&'static dyn Fn(&[char]) -> Option<usize>),
+	Regex(Regex)
 }
 
 
@@ -60,6 +64,30 @@ impl MatchMethodSource for (&str, bool, &str, Option<&str>, &str, Option<&str>) 
 				self.4.chars().collect(),
 				self.5.map(|value| value.chars().collect())
 			)
+		)
+	}
+}
+impl MatchMethodSource for (&str, bool, &'static dyn Fn(&[char]) -> Option<usize>, &'static dyn Fn(&[char]) -> Option<usize>) {
+	fn to_identification(&self) -> SegmentIdentification {
+		SegmentIdentification::new(
+			self.0,
+			self.1,
+			MatchMethod::Method(self.2),
+			MatchMethod::Method(self.3)
+		)
+	}
+}
+impl MatchMethodSource for (&str, &str) {
+	fn to_identification(&self) -> SegmentIdentification {
+		if !self.1.starts_with('^') {
+			// Could be solved automatically, but this also warns the user that they are using regex.
+			panic!("Any regex used in a NestedCodeParser should start with '^', making sure it only matches the contents at the current cursor.");
+		}
+		SegmentIdentification::new(
+			self.0,
+			false,
+			MatchMethod::Regex(Regex::new(self.1).unwrap()),
+			MatchMethod::Method(&|_| Some(0))
 		)
 	}
 }

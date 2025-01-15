@@ -92,4 +92,24 @@ mod tests {
 		assert_eq!(parser.parse(r#"- "test\\" -"#).unwrap().contents()[1].contents_joined(), r#""test\\""#);
 		assert_eq!(parser.parse(r#"- "test\\\"" -"#).unwrap().contents()[1].contents_joined(), r#""test\\\"""#);
 	}
+
+	#[test]
+	fn test_identification_types() {
+
+		// CharSet match.
+		let parser:NestedCodeParser = NestedCodeParser::new(vec![&("comment", false, "//", "\n")]);
+		assert_eq!(parser.parse("-- // test\n --").unwrap().contents()[1].contents_joined(), "// test\n");
+		let parser:NestedCodeParser = NestedCodeParser::new(vec![&("comment", false, "//", Some("P"), "\n", Some("\\"))]);
+		assert_eq!(parser.parse("-- P// // test\\\n \n --").unwrap().contents()[1].contents_joined(), "// test\\\n \n");
+
+		// Method match.
+		const OPEN:&'static dyn Fn(&[char]) -> Option<usize> = &|contents:&[char]| if contents[0] == '/' && contents[1] == '/' { Some(2) } else { None };
+		const CLOSE:&'static dyn Fn(&[char]) -> Option<usize> = &|contents:&[char]| if contents[0] == '\n' { Some(1) } else { None };
+		let parser:NestedCodeParser = NestedCodeParser::new(vec![&("comment", false, OPEN, CLOSE)]);
+		assert_eq!(parser.parse("-- // test\n --").unwrap().contents()[1].contents_joined(), "// test\n");
+
+		// Regex match.
+		let parser:NestedCodeParser = NestedCodeParser::new(vec![&("comment", "^//.+\n")]);
+		assert_eq!(parser.parse("-- // test\n --").unwrap().contents()[1].contents_joined(), "// test\n");
+	}
 }
