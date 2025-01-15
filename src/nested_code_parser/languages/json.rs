@@ -1,4 +1,4 @@
-use crate::{ NestedCode, NestedCodeParser, MatchMethodSource };
+use crate::{ NestedCodeSegment, NestedCodeParser, LazyMatchSource };
 use std::error::Error;
 
 
@@ -23,7 +23,7 @@ fn json_parser() -> &'static NestedCodeParser {
 			None => {
 				JSON_PARSER = Some(
 					NestedCodeParser::new(
-						DEFINITION_SETS.iter().map(|set| set as &dyn MatchMethodSource).collect::<Vec<&dyn MatchMethodSource>>()
+						DEFINITION_SETS.iter().map(|set| set as &dyn LazyMatchSource).collect::<Vec<&dyn LazyMatchSource>>()
 					).ignore_white_space_segments()
 				);
 				json_parser()
@@ -48,30 +48,30 @@ impl Json {
 	pub fn new(contents:&str) -> Result<Json, Box<dyn Error>> {
 
 		// Parse and validate contents.
-		let parsed_contents:NestedCode = json_parser().parse(contents.trim())?;
-		if parsed_contents.contents().is_empty() || !parsed_contents[0].matched() {
+		let parsed_contents:NestedCodeSegment = json_parser().parse(contents.trim())?;
+		if parsed_contents.sub_segments().is_empty() || !parsed_contents[0].matched() {
 			return Err(format!("Could not parse JSON from contents:\n\n{}", contents).into());
 		}
 
 		// Return json nodes from contents.
-		Self::nested_code_to_json_node(&parsed_contents.contents()[0])
+		Self::nested_code_to_json_node(&parsed_contents.sub_segments()[0])
 	}
 
 	/// Turn a parsed contents node into a json node.
-	fn nested_code_to_json_node(parsed_code:&NestedCode) -> Result<Json, Box<dyn Error>> {
+	fn nested_code_to_json_node(parsed_code:&NestedCodeSegment) -> Result<Json, Box<dyn Error>> {
 
 		// Parse dictionary.
 		if parsed_code.type_name() == DICT_DEFINITION.0 {
-			if !parsed_code.contents().iter().enumerate().filter(|(index, _)| index % 4 == 1).all(|(_, sub_content)| sub_content.contents_joined().trim() == ":") {
-				return Err(format!("Could not create json dictionary from contents. Expected ':' in:\n\n{}", parsed_code.contents_joined()).into());
+			if !parsed_code.sub_segments().iter().enumerate().filter(|(index, _)| index % 4 == 1).all(|(_, sub_content)| sub_content.outer_contents().trim() == ":") {
+				return Err(format!("Could not create json dictionary from contents. Expected ':' in:\n\n{}", parsed_code.outer_contents()).into());
 			}
-			if !parsed_code.contents().iter().enumerate().filter(|(index, _)| index % 4 == 3).all(|(_, sub_content)| sub_content.contents_joined().trim() == ",") {
-				return Err(format!("Could not create json dictionary from contents. Expected ',' in:\n\n{}", parsed_code.contents_joined()).into());
+			if !parsed_code.sub_segments().iter().enumerate().filter(|(index, _)| index % 4 == 3).all(|(_, sub_content)| sub_content.outer_contents().trim() == ",") {
+				return Err(format!("Could not create json dictionary from contents. Expected ',' in:\n\n{}", parsed_code.outer_contents()).into());
 			}
-			if parsed_code.contents().len() % 4 != 3 {
-				return Err(format!("Could not create json dictionary from contents. Unexpected end in:\n\n{}", parsed_code.contents_joined()).into());
+			if parsed_code.sub_segments().len() % 4 != 3 {
+				return Err(format!("Could not create json dictionary from contents. Unexpected end in:\n\n{}", parsed_code.outer_contents()).into());
 			}
-			let items:Vec<Result<Json, Box<dyn Error>>> = parsed_code.contents().iter().enumerate().filter(|(index, _)| index % 2 == 0).map(|(_, item)| Self::nested_code_to_json_node(item)).collect();
+			let items:Vec<Result<Json, Box<dyn Error>>> = parsed_code.sub_segments().iter().enumerate().filter(|(index, _)| index % 2 == 0).map(|(_, item)| Self::nested_code_to_json_node(item)).collect();
 			if items.iter().all(|item| item.is_ok()) {
 				return Ok(Json::Dict((0..items.len() / 2).map(|item_index| (items[item_index * 2].as_ref().unwrap().clone(), items[item_index * 2 + 1].as_ref().unwrap().clone())).collect::<Vec<(Json, Json)>>()));
 			}
@@ -79,10 +79,10 @@ impl Json {
 
 		// Parse array.
 		if parsed_code.type_name() == ARRAY_DEFINITION.0 {
-			if !parsed_code.contents().iter().enumerate().filter(|(index, _)| index % 2 == 1).all(|(_, sub_content)| sub_content.contents_joined().trim() == ",") {
-				return Err(format!("Could not create json array from contents. Each odd index should be a comma, but is not in:\n\n{}", parsed_code.contents_joined()).into());
+			if !parsed_code.sub_segments().iter().enumerate().filter(|(index, _)| index % 2 == 1).all(|(_, sub_content)| sub_content.outer_contents().trim() == ",") {
+				return Err(format!("Could not create json array from contents. Each odd index should be a comma, but is not in:\n\n{}", parsed_code.outer_contents()).into());
 			}
-			let items:Vec<Result<Json, Box<dyn Error>>> = parsed_code.contents().iter().enumerate().filter(|(index, _)| index % 2 == 0).map(|(_, item)| Self::nested_code_to_json_node(item)).collect();
+			let items:Vec<Result<Json, Box<dyn Error>>> = parsed_code.sub_segments().iter().enumerate().filter(|(index, _)| index % 2 == 0).map(|(_, item)| Self::nested_code_to_json_node(item)).collect();
 			if items.iter().all(|item| item.is_ok()) {
 				return Ok(Json::Array(items.iter().flatten().cloned().collect()));
 			}
@@ -90,11 +90,11 @@ impl Json {
 		
 		// Parse string.
 		if parsed_code.type_name() == STRING_DEFINITION.0 {
-			return Ok(Json::String(parsed_code.contents_joined().to_string()));
+			return Ok(Json::String(parsed_code.outer_contents().to_string()));
 		}
 
 		// Could not parse, return error.
-		Err(format!("Could not create json from contents:\n\n{}", parsed_code.contents_joined()).into())
+		Err(format!("Could not create json from contents:\n\n{}", parsed_code.outer_contents()).into())
 	}
 }
 impl ToString for Json {
