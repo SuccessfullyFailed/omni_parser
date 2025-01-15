@@ -156,7 +156,13 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 		let tag_end:usize = self.cursor + tag.len();
 		if self.contents.len() >= tag_end && &self.contents[self.cursor..tag_end] == tag {
 			if let Some(escape) = escape {
-				if self.cursor >= escape.len() && &self.contents[self.cursor - escape.len()..self.cursor] != escape {
+				let mut escaped:bool = false;
+				let mut cursor:usize = self.cursor;
+				while cursor >= escape.len() && &self.contents[cursor - escape.len()..cursor] == escape {
+					escaped = !escaped;
+					cursor -= escape.len();
+				}
+				if !escaped {
 					return Some(tag.len());
 				}
 			} else {
@@ -213,8 +219,14 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 
 		// Do the same thing reversed for the escape tag.
 		if let Some(escape) = escape {
-			if self.tag_matches_contents_match_any_whitespace(&contents[..cursor].iter().rev().cloned().collect::<Vec<char>>(), 0, &escape.iter().rev().cloned().collect::<Vec<char>>(), &None).is_some() {
-				return None;	
+			let mut escaped:bool = false;
+			let mut escape_cursor:usize = cursor;
+			while self.tag_matches_contents_match_any_whitespace(&contents[..escape_cursor].iter().rev().cloned().collect::<Vec<char>>(), 0, &escape.iter().rev().cloned().collect::<Vec<char>>(), &None).is_some() {
+				escaped = !escaped;
+				escape_cursor -= escape.len();
+			}
+			if escaped {
+				return None;
 			}
 		}
 

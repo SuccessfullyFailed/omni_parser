@@ -113,4 +113,19 @@ mod tests {
 			vec![ROOT_NAME, "if-statement", UNMATCHED_NAME, "scope", "comment", UNMATCHED_NAME, UNMATCHED_NAME, "if-statement", UNMATCHED_NAME, "scope", "print-statement", "string", UNMATCHED_NAME, UNMATCHED_NAME, UNMATCHED_NAME, "scope", "comment", UNMATCHED_NAME, UNMATCHED_NAME]
 		);
 	}
+
+	#[test]
+	fn test_double_escape() {
+		let parser:NestedCodeParser = example_parser();
+		assert_eq!(parser.parse(r#"- "test" -"#).unwrap().contents()[1].contents_joined(), r#""test""#);
+		assert_eq!(parser.parse(r#"- "test\"" -"#).unwrap().contents()[1].contents_joined(), r#""test\"""#);
+		assert_eq!(parser.parse(r#"- "test\\" -"#).unwrap().contents()[1].contents_joined(), r#""test\\""#);
+		assert_eq!(parser.parse(r#"- "test\\\"" -"#).unwrap().contents()[1].contents_joined(), r#""test\\\"""#);
+		
+		let parser:NestedCodeParser = example_parser().ignore_white_space_segments();
+		assert_eq!(parser.parse(r#"- "test" -"#).unwrap().contents()[1].contents_joined(), r#""test""#);
+		assert_eq!(parser.parse(r#"- "test\"" -"#).unwrap().contents()[1].contents_joined(), r#""test\"""#);
+		assert_eq!(parser.parse(r#"- "test\\" -"#).unwrap().contents()[1].contents_joined(), r#""test\\""#);
+		assert_eq!(parser.parse(r#"- "test\\\"" -"#).unwrap().contents()[1].contents_joined(), r#""test\\\"""#);
+	}
 }
