@@ -1,5 +1,7 @@
 use regex::Regex;
 
+
+
 #[derive(Clone)]
 pub struct SegmentIdentification {
 	pub(super) name:String,
@@ -86,8 +88,9 @@ impl LazyMatchSource for (&str, &str) {
 		SegmentIdentification::new(
 			self.0,
 			false,
-			MatchMethod::Regex(Regex::new(self.1).unwrap()),
-			MatchMethod::Method(&|_| Some(0))
+			MatchMethod::Regex(Regex::new(self.1).expect("Could not parse regex")),
+			MatchMethod::Method(AUTO_CLOSE)
 		)
 	}
 }
+pub const AUTO_CLOSE:&'static dyn Fn(&str) -> Option<usize> = &|_| Some(0);

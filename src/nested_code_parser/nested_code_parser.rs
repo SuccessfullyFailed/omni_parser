@@ -139,7 +139,7 @@ impl<'a, 'b> InnerNestedCodeParser<'a, 'b> {
 		match matching_method {
 			MatchMethod::CharCompare(tag, escape) => self.cursor_matches_str_literal(tag, escape),
 			MatchMethod::Method(method)  => method(&self.contents[self.cursor..]),
-			MatchMethod::Regex(regex) => regex.captures(&self.contents[self.cursor..]).map(|regex_match| regex_match.get(0).map(|group| group.len()).unwrap_or_default())
+			MatchMethod::Regex(regex) => regex.find(&self.contents[self.cursor..]).map(|regex_match| regex_match.len())
 		}
 	}
 
