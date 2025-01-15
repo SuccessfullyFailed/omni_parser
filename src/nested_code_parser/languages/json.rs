@@ -1,4 +1,4 @@
-use crate::{ NestedCode, NestedCodeParser, SegmentIdentificationSource };
+use crate::{ NestedCode, NestedCodeParser, MatchMethodSource };
 use std::error::Error;
 
 
@@ -23,7 +23,7 @@ fn json_parser() -> &'static NestedCodeParser {
 			None => {
 				JSON_PARSER = Some(
 					NestedCodeParser::new(
-						DEFINITION_SETS.iter().map(|set| set as &dyn SegmentIdentificationSource).collect::<Vec<&dyn SegmentIdentificationSource>>()
+						DEFINITION_SETS.iter().map(|set| set as &dyn MatchMethodSource).collect::<Vec<&dyn MatchMethodSource>>()
 					).ignore_white_space_segments()
 				);
 				json_parser()
