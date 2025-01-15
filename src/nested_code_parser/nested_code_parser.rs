@@ -1,4 +1,4 @@
-use super::{ NestedCode, SegmentIdentification, SegmentIdentificationSource };
+use super::{ MatchMethod, MatchMethodSource, NestedCode, SegmentIdentification };
 use std::{ error::Error, ops::Range };
 
 
@@ -12,7 +12,6 @@ pub const UNMATCHED_WHITESPACE_NAME:&str = "UNMATCHED_WHITESPACE";
 #[derive(Clone)]
 pub struct NestedCodeParser {
 	identification:Vec<SegmentIdentification>,
-	match_any_white_space:bool,
 	ignore_white_space_segments:bool
 }
 impl NestedCodeParser {
@@ -20,18 +19,11 @@ impl NestedCodeParser {
 	/* CONSTRUCTOR METHODS */
 
 	/// Create a new parser.
-	pub fn new(identification:Vec<&dyn SegmentIdentificationSource>) -> NestedCodeParser {
+	pub fn new(identification:Vec<&dyn MatchMethodSource>) -> NestedCodeParser {
 		NestedCodeParser {
 			identification: identification.iter().map(|id_source| id_source.to_identification()).collect::<Vec<SegmentIdentification>>(),
-			match_any_white_space: false,
 			ignore_white_space_segments: false
 		}
-	}
-
-	/// Return a version of self that, when matching strings, matches any white-spaces equally.
-	pub fn match_any_white_space(mut self) -> Self {
-		self.match_any_white_space = true;
-		self
 	}
 
 	/// Return a version of self that will not add segments that are only white-space.
@@ -83,7 +75,7 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 			
 			// Try to match closing tag.
 			if let Some((open_tag_location, target_identification)) = &scope_terminator {
-				if let Some(match_length) = self.cursor_matches_tag(&target_identification.close, &target_identification.close_escape) {
+				if let Some(match_length) = self.cursor_matches_tag(&target_identification.matching_method_close) {
 					if let Some(from_unmatched) = self.code_from_unmatched() {
 						children.push(from_unmatched);
 					}
@@ -98,7 +90,7 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 			let allow_recurse:bool = scope_terminator.as_ref().map(|(_, identification)| identification.allow_sub_parse).unwrap_or(true);
 			if allow_recurse {
 				for identification_set in &self.origin.identification {
-					if let Some(match_length) = self.cursor_matches_tag(&identification_set.open, &identification_set.open_escape) {
+					if let Some(match_length) = self.cursor_matches_tag(&identification_set.matching_method_open) {
 						if let Some(from_unmatched) = self.code_from_unmatched() {
 							children.push(from_unmatched);
 						}
@@ -143,11 +135,9 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 	}
 
 	/// Checks wether or not the contents at the cursor match the given tag. Returns the length of the match in contents or None.
-	fn cursor_matches_tag(&self, tag:&[char], escape:&Option<Vec<char>>) -> Option<usize> {
-		if self.origin.match_any_white_space {
-			self.tag_matches_contents_match_any_whitespace(&self.contents, self.cursor, tag, escape)
-		} else {
-			self.cursor_matches_tag_literal(tag, escape)
+	fn cursor_matches_tag(&self, matching_method:&MatchMethod) -> Option<usize> {
+		match matching_method {
+			MatchMethod::CharCompare(tag, escape) => self.cursor_matches_tag_literal(tag, escape)
 		}
 	}
 
@@ -170,71 +160,5 @@ impl<'a, 'b> InnerNestedCodeParser<'a> {
 			}
 		}
 		None
-	}
-
-	/// Check if a specific tag matches a specific place in contents by simply checking if the strings are the same. Returns the length of the match.
-	fn tag_matches_contents_match_any_whitespace(&self, contents:&[char], cursor:usize, tag:&[char], escape:&Option<Vec<char>>) -> Option<usize> {
-		let sub_contents:&[char] = &contents[cursor..];
-
-		// If tag is all white-space, simply check if the next white-space contains all tag chars.
-		if tag.iter().all(|char| char.is_whitespace()) {
-			let mut tag_char_index:usize = 0;
-			for (character_index, character) in sub_contents.iter().enumerate() {
-				if !character.is_whitespace() {
-					break;
-				}
-				if character == &tag[tag_char_index] {
-					tag_char_index += 1;
-					if tag_char_index >= tag.len() {
-						return Some(character_index + 1);
-					}
-				}
-			}
-			return None;
-		}
-		
-		// Keep comparing contents to tag at indexes.
-		let mut indexes:[usize; 2] = [0, 0];
-		while indexes[0] < sub_contents.len() && indexes[1] < tag.len() {
-
-			// Skip over white-space.
-			if sub_contents[indexes[0]].is_whitespace() && tag[indexes[1]].is_whitespace() {
-				while indexes[0] < sub_contents.len() && sub_contents[indexes[0]].is_whitespace() {
-					indexes[0] += 1;
-				}
-				while indexes[1] < tag.len() && tag[indexes[1]].is_whitespace() {
-					indexes[1] += 1;
-				}
-			}
-
-			// If not both white-space, compare.
-			else {
-				if sub_contents[indexes[0]] != tag[indexes[1]] {
-					return None;
-				}
-				indexes[0] += 1;
-				indexes[1] += 1;
-			}
-		}
-
-		// Do the same thing reversed for the escape tag.
-		if let Some(escape) = escape {
-			let mut escaped:bool = false;
-			let mut escape_cursor:usize = cursor;
-			while self.tag_matches_contents_match_any_whitespace(&contents[..escape_cursor].iter().rev().cloned().collect::<Vec<char>>(), 0, &escape.iter().rev().cloned().collect::<Vec<char>>(), &None).is_some() {
-				escaped = !escaped;
-				escape_cursor -= escape.len();
-			}
-			if escaped {
-				return None;
-			}
-		}
-
-		// If tag indexer has reached end, that means it's a full match.
-		if indexes[1] >= tag.len() {
-			Some(indexes[0])
-		} else {
-			None
-		}
 	}
 }
