@@ -7,7 +7,7 @@ use std::error::Error;
 type DefinitionSet<'a> = (&'a str, bool, &'a str, Option<&'a str>, &'a str, Option<&'a str>);
 const DICT_DEFINITION:DefinitionSet = ("dict", true, "{", None, "}", None);
 const ARRAY_DEFINITION:DefinitionSet = ("array", true, "[", None, "]", None);
-const STRING_DEFINITION:DefinitionSet = ("string", false, "\"", None, "\"", Some("\\")); // "\\" is seen as escape for end quote, make a check for double escapes
+const STRING_DEFINITION:DefinitionSet = ("string", false, "\"", None, "\"", Some("\\"));
 const STRING_DEFINITION_LITERAL:DefinitionSet = ("string", false, "'", None, "'", None);
 const STRING_DEFINITION_MOD:DefinitionSet = ("string", false, "`", None, "`", None);
 const DEFINITION_SETS:&[DefinitionSet] = &[DICT_DEFINITION, ARRAY_DEFINITION, STRING_DEFINITION, STRING_DEFINITION_LITERAL, STRING_DEFINITION_MOD];
