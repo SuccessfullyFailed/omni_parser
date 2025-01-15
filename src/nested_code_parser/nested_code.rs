@@ -1,26 +1,28 @@
-use std::{ fmt::{ self, Debug }, ops::{ Index, IndexMut } };
+use std::{ fmt::{ self, Debug }, ops::{ Index, IndexMut, Range } };
 
 
 
-pub struct NestedCode {
+pub struct NestedCodeSegment {
 	type_name:String,
 	matched:bool,
-	open_tag:String,
-	close_tag:String,
-	contents:Vec<NestedCode>
+	outer_contents:String,
+	open_tag_len:usize,
+	close_tag_len:usize,
+	sub_segments:Vec<NestedCodeSegment>
 }
-impl NestedCode {
+impl NestedCodeSegment {
 
 	/* CONSTRUCTOR METHODS */
 
-	/// Create a new NestedCode<'a>.
-	pub fn new(type_name:&str, matched:bool, open_tag:&[char], close_tag:&[char], contents:Vec<NestedCode>) -> NestedCode {
-		NestedCode {
+	/// Create a new NestedCode.
+	pub fn new(type_name:&str, matched:bool, source_contents:&str, open_tag_position:Range<usize>, close_tag_position:Range<usize>, sub_segments:Vec<NestedCodeSegment>) -> NestedCodeSegment {
+		NestedCodeSegment {
 			type_name: type_name.to_string(),
 			matched,
-			open_tag: open_tag.iter().collect::<String>(),
-			close_tag: close_tag.iter().collect::<String>(),
-			contents
+			outer_contents: source_contents[open_tag_position.start..close_tag_position.end].to_string(),
+			open_tag_len: open_tag_position.end - open_tag_position.start,
+			close_tag_len: close_tag_position.end - close_tag_position.start,
+			sub_segments
 		}
 	}
 
@@ -40,38 +42,60 @@ impl NestedCode {
 
 	/// Get the open tag.
 	pub fn open_tag(&self) -> &str {
-		&self.open_tag
+		&self.outer_contents[..self.open_tag_len]
 	}
 
 	/// Get the closing tag.
 	pub fn close_tag(&self) -> &str {
-		&self.close_tag
+		&self.outer_contents[self.outer_contents.len() - self.close_tag_len..]
 	}
 
-	/// Get the contents.
-	pub fn contents(&self) -> &Vec<NestedCode> {
-		&self.contents
+
+
+	/* CONTENT GETTER METHODS */
+
+	/// Get the outer contents of the full segment.
+	pub fn outer_contents(&self) -> &str {
+		&self.outer_contents
 	}
 
-	/// Get the contents.
-	pub fn contents_joined(&self) -> String {
-		[
-			self.open_tag.clone(),
-			self.contents.iter().map(|child| child.contents_joined()).collect::<Vec<String>>().join(""),
-			self.close_tag.clone()
-		].join("")
+	/// Get the inner contents of the full segment (without tags, only the code in between).
+	pub fn inner_contents(&self) -> &str {
+		&self.outer_contents[self.open_tag_len..self.outer_contents.len() - self.close_tag_len]
+	}
+
+	/// Get the sub-segments.
+	pub fn sub_segments(&self) -> &Vec<NestedCodeSegment> {
+		&self.sub_segments
+	}
+
+	/// Get all code segments at a specific depth.
+	pub fn sub_segments_at_depth(&self, depth:usize) -> Vec<&NestedCodeSegment> {
+		self._sub_segments_at_depth(0, depth)
+	}
+	fn _sub_segments_at_depth(&self, current_depth:usize, target_depth:usize) -> Vec<&NestedCodeSegment> {
+		if current_depth == target_depth {
+			vec![self]
+		} else if current_depth > target_depth {
+			Vec::new()
+		} else {
+			let child_depth:usize = current_depth + 1;
+			self.sub_segments.iter().map(|child| child._sub_segments_at_depth(child_depth, target_depth)).flatten().collect()
+		}
 	}
 
 	/// Get a flat list of self and all children and their depth.
-	pub fn flatten(&self) -> Vec<(usize, &NestedCode)> {
-		let mut entries:Vec<(usize, &NestedCode)> = vec![(0, &self)];
-		let mut children:Vec<(usize, &NestedCode)> = self.contents.iter().map(|child| child.flatten()).flatten().collect::<Vec<(usize, &NestedCode)>>();
-		children.iter_mut().for_each(|(depth, _)| *depth += 1);
-		entries.extend(children);
-		entries
+	pub fn flatten(&self) -> Vec<(usize, &NestedCodeSegment)> {
+		self._flatten(0)
+	}
+	fn _flatten(&self, current_depth:usize) -> Vec<(usize, &NestedCodeSegment)> {
+		let mut flattened_with_depth:Vec<(usize, &NestedCodeSegment)> = vec![(current_depth, self)];
+		let child_depth:usize = current_depth + 1;
+		flattened_with_depth.extend(self.sub_segments.iter().map(|child| child._flatten(child_depth)).flatten().collect::<Vec<(usize, &NestedCodeSegment)>>());
+		flattened_with_depth
 	}
 }
-impl Debug for NestedCode {
+impl Debug for NestedCodeSegment {
 	fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result {
 		const PADDING:&str = "\t";
 		write!(
@@ -79,32 +103,32 @@ impl Debug for NestedCode {
 			"{} {}\n{}\n{}",
 			self.type_name(),
 			'{',
-				self.contents.iter().map(|code|
+				self.sub_segments.iter().map(|code|
 					format!("{:?}", code).split('\n').map(|line| PADDING.to_owned() + line).collect::<Vec<String>>().join("\n")
 				).collect::<Vec<String>>().join("\n"),
 			'}'
 		)
 	}
 }
-impl Index<usize> for NestedCode {
-	type Output = NestedCode;
+impl Index<usize> for NestedCodeSegment {
+	type Output = NestedCodeSegment;
 	fn index(&self, index:usize) -> &Self::Output {
-		&self.contents[index]
+		&self.sub_segments[index]
 	}
 }
-impl IndexMut<usize> for NestedCode {
+impl IndexMut<usize> for NestedCodeSegment {
 	fn index_mut(&mut self, index:usize) -> &mut Self::Output {
-		&mut self.contents[index]
+		&mut self.sub_segments[index]
 	}
 }
-impl Index<&str> for NestedCode {
-	type Output = NestedCode;
+impl Index<&str> for NestedCodeSegment {
+	type Output = NestedCodeSegment;
 	fn index(&self, index:&str) -> &Self::Output {
-		self.contents.iter().find(|child| child.type_name() == index).unwrap()
+		self.sub_segments.iter().find(|child| child.type_name() == index).unwrap()
 	}
 }
-impl IndexMut<&str> for NestedCode {
+impl IndexMut<&str> for NestedCodeSegment {
 	fn index_mut(&mut self, index:&str) -> &mut Self::Output {
-		self.contents.iter_mut().find(|child| child.type_name() == index).unwrap()
+		self.sub_segments.iter_mut().find(|child| child.type_name() == index).unwrap()
 	}
 }
