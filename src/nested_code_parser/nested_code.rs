@@ -69,6 +69,16 @@ impl NestedCodeSegment {
 		&self.sub_segments
 	}
 
+	/// Get all matched sub-segments.
+	pub fn sub_segments_matched(&self) -> Vec<&NestedCodeSegment> {
+		self.sub_segments.iter().filter(|segment| segment.matched).collect()
+	}
+
+	/// Get all unmatched sub-segments.
+	pub fn sub_segments_unmatched(&self) -> Vec<&NestedCodeSegment> {
+		self.sub_segments.iter().filter(|segment| !segment.matched).collect()
+	}
+
 	/// Get all code segments at a specific depth.
 	pub fn sub_segments_at_depth(&self, depth:usize) -> Vec<&NestedCodeSegment> {
 		self._sub_segments_at_depth(0, depth)
@@ -85,14 +95,29 @@ impl NestedCodeSegment {
 	}
 
 	/// Get a flat list of self and all children and their depth.
-	pub fn flatten(&self) -> Vec<(usize, &NestedCodeSegment)> {
-		self._flatten(0)
+	pub fn flat(&self) -> Vec<(usize, &NestedCodeSegment)> {
+		self._flat(0)
 	}
-	fn _flatten(&self, current_depth:usize) -> Vec<(usize, &NestedCodeSegment)> {
+	fn _flat(&self, current_depth:usize) -> Vec<(usize, &NestedCodeSegment)> {
 		let mut flattened_with_depth:Vec<(usize, &NestedCodeSegment)> = vec![(current_depth, self)];
 		let child_depth:usize = current_depth + 1;
-		flattened_with_depth.extend(self.sub_segments.iter().map(|child| child._flatten(child_depth)).flatten().collect::<Vec<(usize, &NestedCodeSegment)>>());
+		flattened_with_depth.extend(self.sub_segments.iter().map(|child| child._flat(child_depth)).flatten().collect::<Vec<(usize, &NestedCodeSegment)>>());
 		flattened_with_depth
+	}
+
+
+	/// Get a flat list of all matched sub-segments.
+	pub fn flat_segments_matched(&self) -> Vec<(usize, &NestedCodeSegment)> {
+		let mut segments:Vec<(usize, &NestedCodeSegment)> = self.flat();
+		segments.retain(|segment| segment.1.matched);
+		segments
+	}
+
+	/// Get a flat list of all unmatched sub-segments.
+	pub fn flat_sub_segments_unmatched(&self) -> Vec<(usize, &NestedCodeSegment)> {
+		let mut segments:Vec<(usize, &NestedCodeSegment)> = self.flat();
+		segments.retain(|segment| !segment.1.matched);
+		segments
 	}
 }
 impl Debug for NestedCodeSegment {

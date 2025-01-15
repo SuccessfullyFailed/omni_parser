@@ -54,7 +54,7 @@ mod tests {
 		assert_eq!(result[4][1].type_name(), "comment");
 		assert_eq!(result[5].type_name(), UNMATCHED_NAME);
 		assert_eq!(
-		 	result.flatten().iter().map(|(_, code)| code.type_name()).collect::<Vec<&str>>(),
+		 	result.flat().iter().map(|(_, code)| code.type_name()).collect::<Vec<&str>>(),
 			vec![ROOT_NAME, UNMATCHED_WHITESPACE_NAME, "if-statement", UNMATCHED_NAME, "scope", UNMATCHED_WHITESPACE_NAME, "comment", UNMATCHED_NAME, UNMATCHED_NAME, "if-statement", UNMATCHED_NAME, "scope", UNMATCHED_WHITESPACE_NAME, "print-statement", "string", UNMATCHED_NAME, UNMATCHED_NAME, UNMATCHED_WHITESPACE_NAME, UNMATCHED_WHITESPACE_NAME, UNMATCHED_NAME, "scope", UNMATCHED_WHITESPACE_NAME, "comment", UNMATCHED_NAME, UNMATCHED_WHITESPACE_NAME, UNMATCHED_NAME]
 		);
 	}
@@ -79,7 +79,7 @@ mod tests {
 		assert_eq!(result[3][0].type_name(), "comment");
 		assert_eq!(result[4].type_name(), UNMATCHED_NAME);
 		assert_eq!(
-		 	result.flatten().iter().map(|(_, code)| code.type_name()).collect::<Vec<&str>>(),
+		 	result.flat().iter().map(|(_, code)| code.type_name()).collect::<Vec<&str>>(),
 			vec![ROOT_NAME, "if-statement", UNMATCHED_NAME, "scope", "comment", UNMATCHED_NAME, UNMATCHED_NAME, "if-statement", UNMATCHED_NAME, "scope", "print-statement", "string", UNMATCHED_NAME, UNMATCHED_NAME, UNMATCHED_NAME, "scope", "comment", UNMATCHED_NAME, UNMATCHED_NAME]
 		);
 	}
