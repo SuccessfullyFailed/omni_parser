@@ -92,33 +92,88 @@ impl NestedSegment {
 		}
 	}
 
-	/// Recursively get the segments' sub-segments flattened with their depth.
-	pub fn flat(&self) -> Vec<(usize, &NestedSegment)> {
+
+
+	/* FLATTENING METHODS */
+
+	/// Recursively get filtered segments and sub-segments flattened with their depth.
+	pub fn flat_filtered<T>(&self, filter:T) -> Vec<(usize, &NestedSegment)> where T:Fn(usize, &NestedSegment) -> bool {
 		let mut segments:Vec<(usize, &NestedSegment)> = Vec::new();
-		self._flat(&mut segments, 0);
+		self._flat_filtered(&mut segments, 0, &filter);
 		segments
 	}
-	fn _flat<'a>(&'a self, result_list:&mut Vec<(usize, &'a NestedSegment)>, depth:usize) {
-		result_list.push((depth, self));
+	fn _flat_filtered<'a>(&'a self, result_list:&mut Vec<(usize, &'a NestedSegment)>, depth:usize, filter:&dyn Fn(usize, &NestedSegment) -> bool) {
+		if filter(depth, self) {
+			result_list.push((depth, self));
+		}
 		for sub_segment in self.sub_segments() {
-			sub_segment._flat(result_list, depth + 1);
+			sub_segment._flat_filtered(result_list, depth + 1, filter);
 		}
 	}
 
-	/// Recursively get the segments' sub-segments mutable, flattened with their depth.
-	pub fn flat_mut(&mut self) -> Vec<(usize, &mut NestedSegment)> {
+	/// Recursively get filtered segments and sub-segments mutable, flattened with their depth.
+	pub fn flat_filtered_mut<T>(&mut self, filter:T) -> Vec<(usize, &mut NestedSegment)> where T:Fn(usize, &NestedSegment) -> bool {
 		let mut segments:Vec<(usize, &mut NestedSegment)> = Vec::new();
-		self._flat_mut(&mut segments, 0);
+		self._flat_filtered_mut(&mut segments, 0, &filter);
 		segments
 	}
-	fn _flat_mut<'a>(&'a mut self, result_list:&mut Vec<(usize, &'a mut NestedSegment)>, depth:usize) {
-		let self_pointer:*mut NestedSegment = self as *mut NestedSegment;
-		result_list.push((depth, unsafe { &mut *self_pointer }));
+	fn _flat_filtered_mut<'a>(&'a mut self, result_list:&mut Vec<(usize, &'a mut NestedSegment)>, depth:usize, filter:&dyn Fn(usize, &NestedSegment) -> bool) {
+		if filter(depth, self) {
+			let self_pointer:*mut NestedSegment = self as *mut NestedSegment;
+			result_list.push((depth, unsafe { &mut *self_pointer }));
+		}
 		for sub_segment in self.sub_segments_mut() {
-			sub_segment._flat_mut(result_list, depth + 1);
+			sub_segment._flat_filtered_mut(result_list, depth + 1, filter);
 		}
 	}
 
+	/// Recursively get the segments and sub-segments flattened with their depth.
+	pub fn flat(&self) -> Vec<(usize, &NestedSegment)> {
+		self.flat_filtered(|_, _| true)
+	}
+
+	/// Recursively get the segments and sub-segments mutable, flattened with their depth.
+	pub fn flat_mut(&mut self) -> Vec<(usize, &mut NestedSegment)> {
+		self.flat_filtered_mut(|_, _| true)
+	}
+
+	
+	/// Recursively get code segments and sub-segments mutable, flattened with their depth.
+	pub fn flat_code_filtered<T>(&self, filter:T) -> Vec<(usize, &NestedSegmentCode)> where T:Fn(usize, &NestedSegmentCode) -> bool {
+		let mut results:Vec<(usize, &NestedSegmentCode)> = Vec::new();
+		for (depth, segment) in self.flat_filtered(|_, segment| segment.is_code()) {
+			if let NestedSegment::Code(code) = segment {
+				if filter(depth, &code) {
+					results.push((depth, code));
+				}
+			}
+		}
+		results
+	}
+
+	/// Recursively get code segments and sub-segments mutable, flattened with their depth.
+	pub fn flat_code_filtered_mut<T>(&mut self, filter:T) -> Vec<(usize, &mut NestedSegmentCode)> where T:Fn(usize, &NestedSegmentCode) -> bool {
+		let mut results:Vec<(usize, &mut NestedSegmentCode)> = Vec::new();
+		for (depth, segment) in self.flat_filtered_mut(|_, segment| segment.is_code()) {
+			if let NestedSegment::Code(code) = segment {
+				if filter(depth, &code) {
+					results.push((depth, code));
+				}
+			}
+		}
+		results
+	}
+
+	/// Recursively get code segments and sub-segments flattened with their depth.
+	pub fn flat_code(&self) -> Vec<(usize, &NestedSegmentCode)> {
+		self.flat_code_filtered(|_, _| true)
+	}
+
+	/// Recursively get code segments and sub-segments mutable, flattened with their depth.
+	pub fn flat_code_mut(&mut self) -> Vec<(usize, &mut NestedSegmentCode)> {
+		self.flat_code_filtered_mut(|_, _| true)
+	}
+	
 
 
 	/* ACTION METHODS */
