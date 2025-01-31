@@ -26,7 +26,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "crate_manager"
 version = "0.1.0"
-source = "git+https://github.com/SuccessfullyFailed/crate_manager.git#49c4c2d86bd28197b9b5d60564088b15ab34ab72"
+source = "git+https://github.com/SuccessfullyFailed/crate_manager.git#698e3512d5bfc631e294dba2c702d48d169cba9c"
 dependencies = [
  "file_ref",
  "omni_parser 0.1.0 (git+https://github.com/SuccessfullyFailed/omni_parser.git?branch=no-build-script)",
@@ -75,7 +75,7 @@ dependencies = [
 [[package]]
 name = "omni_parser"
 version = "0.1.0"
-source = "git+https://github.com/SuccessfullyFailed/omni_parser.git?branch=no-build-script#5a6c29a612d2a1fb4d58cc28cc9045c8099e6fcd"
+source = "git+https://github.com/SuccessfullyFailed/omni_parser.git?branch=no-build-script#72098551a206330d298e1cec24616657b040228a"
 dependencies = [
  "file_ref",
  "regex",
