@@ -137,9 +137,41 @@ impl NestedSegment {
 		self.flat_filtered_mut(|_, _| true)
 	}
 
+	
+	/// Recursively get code segments and sub-segments mutable, flattened with their depth.
+	pub fn flat_code_filtered<T>(&self, filter:T) -> Vec<(usize, &NestedSegmentCode)> where T:Fn(usize, &NestedSegmentCode) -> bool {
+		let mut results:Vec<(usize, &NestedSegmentCode)> = Vec::new();
+		for (depth, segment) in self.flat_filtered(|_, segment| segment.is_code()) {
+			if let NestedSegment::Code(code) = segment {
+				if filter(depth, &code) {
+					results.push((depth, code));
+				}
+			}
+		}
+		results
+	}
+
+	/// Recursively get code segments and sub-segments mutable, flattened with their depth.
+	pub fn flat_code_filtered_mut<T>(&mut self, filter:T) -> Vec<(usize, &mut NestedSegmentCode)> where T:Fn(usize, &NestedSegmentCode) -> bool {
+		let mut results:Vec<(usize, &mut NestedSegmentCode)> = Vec::new();
+		for (depth, segment) in self.flat_filtered_mut(|_, segment| segment.is_code()) {
+			if let NestedSegment::Code(code) = segment {
+				if filter(depth, &code) {
+					results.push((depth, code));
+				}
+			}
+		}
+		results
+	}
+
 	/// Recursively get code segments and sub-segments flattened with their depth.
 	pub fn flat_code(&self) -> Vec<(usize, &NestedSegmentCode)> {
-		self.flat_filtered(|_, segment| segment.is_code()).iter().filter_map(|(depth, segment)| if let NestedSegment::Code(code) = *segment { Some((*depth, code)) } else { None }).collect()
+		self.flat_code_filtered(|_, _| true)
+	}
+
+	/// Recursively get code segments and sub-segments mutable, flattened with their depth.
+	pub fn flat_code_mut(&mut self) -> Vec<(usize, &mut NestedSegmentCode)> {
+		self.flat_code_filtered_mut(|_, _| true)
 	}
 	
 
