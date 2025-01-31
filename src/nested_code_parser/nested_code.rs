@@ -105,6 +105,20 @@ impl NestedSegment {
 		}
 	}
 
+	/// Recursively get the segments' sub-segments mutable, flattened with their depth.
+	pub fn flat_mut(&mut self) -> Vec<(usize, &mut NestedSegment)> {
+		let mut segments:Vec<(usize, &mut NestedSegment)> = Vec::new();
+		self._flat_mut(&mut segments, 0);
+		segments
+	}
+	fn _flat_mut<'a>(&'a mut self, result_list:&mut Vec<(usize, &'a mut NestedSegment)>, depth:usize) {
+		let self_pointer:*mut NestedSegment = self as *mut NestedSegment;
+		result_list.push((depth, unsafe { &mut *self_pointer }));
+		for sub_segment in self.sub_segments_mut() {
+			sub_segment._flat_mut(result_list, depth + 1);
+		}
+	}
+
 
 
 	/* ACTION METHODS */
