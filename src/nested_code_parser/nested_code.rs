@@ -5,7 +5,7 @@ use std::{ fmt::{ self, Debug }, ops::{ Index, IndexMut } };
 pub(super) const CONTENTS_NAME:&str = "contents";
 pub(super) const WHITESPACE_NAME:&str = "whitespace";
 #[derive(Clone)]
-pub struct NestedSegmentCode { type_name:String, open_tag:String, sub_segments:Vec<NestedSegment>, close_tag:String }
+pub struct NestedSegmentCode { pub type_name:String, pub open_tag:String, pub sub_segments:Vec<NestedSegment>, pub close_tag:String }
 #[derive(Clone)]
 pub enum NestedSegment { Code(NestedSegmentCode), Contents(String), WhiteSpace(String) }
 impl NestedSegment {
