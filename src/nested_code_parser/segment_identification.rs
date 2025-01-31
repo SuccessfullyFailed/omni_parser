@@ -81,25 +81,11 @@ impl LazyMatchSource for (&str, bool, &'static dyn Fn(&str) -> Option<usize>, &'
 }
 impl LazyMatchSource for (&str, &str) {
 	fn to_identification(&self) -> SegmentIdentification {
-		
-		// Could be solved automatically, but this also warns the user that they are using regex when using lazy definitions.
-		let first_working_char:Option<char> = self.1.chars().skip_while(|char| *char == '(').next();
-		match first_working_char {
-			Some(char) => {
-				if char != '^' {
-					panic!("NestedCodeParser requires regexes to start with '^', making sure it only matches the contents at the current cursor. Not found in regex by name {}: {}", self.0, self.1);
-				}
-			},
-			None => {
-				panic!("NestedCodeParser does not support empty regexes. Found empty regex by name {}: {}", self.0, self.1);
-			}
-		}
-
-		// Return segment struct.
+		let regex:String = if self.1.starts_with('^') { self.1.to_string() } else { "^".to_string() + self.1 };
 		SegmentIdentification::new(
 			self.0,
 			false,
-			MatchMethod::Regex(Regex::new(self.1).expect("Could not parse regex")),
+			MatchMethod::Regex(Regex::new(&regex).expect("Could not parse regex")),
 			MatchMethod::Method(AUTO_CLOSE)
 		)
 	}
