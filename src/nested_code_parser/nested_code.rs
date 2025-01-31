@@ -1,126 +1,170 @@
-use std::{ fmt::{ self, Debug }, ops::{ Index, IndexMut, Range } };
+use std::{ fmt::{ self, Debug }, ops::{ Index, IndexMut } };
 
 
 
-pub struct NestedCodeSegment {
-	type_name:String,
-	matched:bool,
-	outer_contents:String,
-	open_tag_len:usize,
-	close_tag_len:usize,
-	sub_segments:Vec<NestedCodeSegment>
-}
-impl NestedCodeSegment {
+pub(super) const CONTENTS_NAME:&str = "contents";
+pub(super) const WHITESPACE_NAME:&str = "whitespace";
+#[derive(Clone)]
+pub struct NestedSegmentCode { type_name:String, open_tag:String, sub_segments:Vec<NestedSegment>, close_tag:String }
+#[derive(Clone)]
+pub enum NestedSegment { Code(NestedSegmentCode), Contents(String), WhiteSpace(String) }
+impl NestedSegment {
 
 	/* CONSTRUCTOR METHODS */
 
-	/// Create a new NestedCode.
-	pub fn new(type_name:&str, matched:bool, source_contents:&str, open_tag_position:Range<usize>, close_tag_position:Range<usize>, sub_segments:Vec<NestedCodeSegment>) -> NestedCodeSegment {
-		NestedCodeSegment {
-			type_name: type_name.to_string(),
-			matched,
-			outer_contents: source_contents[open_tag_position.start..close_tag_position.end].to_string(),
-			open_tag_len: open_tag_position.end - open_tag_position.start,
-			close_tag_len: close_tag_position.end - close_tag_position.start,
-			sub_segments
+	/// Create a new code segment.
+	pub fn new_code(type_name:&str, open_tag:&str, sub_segments:Vec<NestedSegment>, close_tag:&str) -> NestedSegment {
+		NestedSegment::Code(
+			NestedSegmentCode {
+				type_name: type_name.to_string(),
+				open_tag: open_tag.to_string(),
+				sub_segments: sub_segments,
+				close_tag: close_tag.to_string()
+			}
+		)
+	}
+
+	/// Create a new contents segment.
+	pub fn new_contents(contents:&str) -> NestedSegment {
+		if contents.chars().all(|char| char.is_whitespace()) {
+			NestedSegment::WhiteSpace(contents.to_string())
+		} else {
+			NestedSegment::Contents(contents.to_string())
 		}
+	}
+
+	/// Return self without whitespace.
+	pub fn without_whitespace(mut self) -> Self {
+		self.remove_whitespace();
+		self
 	}
 
 
 
 	/* PROPERTY GETTER METHODS */
 
-	/// Get the type name.
+	/// Get the type-name of the segment.
 	pub fn type_name(&self) -> &str {
-		&self.type_name
-	}
-
-	/// Wether or not the code was matched.
-	pub fn matched(&self) -> bool {
-		self.matched
-	}
-
-	/// Get the open tag.
-	pub fn open_tag(&self) -> &str {
-		&self.outer_contents[..self.open_tag_len]
-	}
-
-	/// Get the closing tag.
-	pub fn close_tag(&self) -> &str {
-		&self.outer_contents[self.outer_contents.len() - self.close_tag_len..]
-	}
-
-
-
-	/* CONTENT GETTER METHODS */
-
-	/// Get the outer contents of the full segment.
-	pub fn outer_contents(&self) -> &str {
-		&self.outer_contents
-	}
-
-	/// Get the inner contents of the full segment (without tags, only the code in between).
-	pub fn inner_contents(&self) -> &str {
-		&self.outer_contents[self.open_tag_len..self.outer_contents.len() - self.close_tag_len]
-	}
-
-	/// Get the sub-segments.
-	pub fn sub_segments(&self) -> &Vec<NestedCodeSegment> {
-		&self.sub_segments
-	}
-
-	/// Get all matched sub-segments.
-	pub fn sub_segments_matched(&self) -> Vec<&NestedCodeSegment> {
-		self.sub_segments.iter().filter(|segment| segment.matched).collect()
-	}
-
-	/// Get all unmatched sub-segments.
-	pub fn sub_segments_unmatched(&self) -> Vec<&NestedCodeSegment> {
-		self.sub_segments.iter().filter(|segment| !segment.matched).collect()
-	}
-
-	/// Get all code segments at a specific depth.
-	pub fn sub_segments_at_depth(&self, depth:usize) -> Vec<&NestedCodeSegment> {
-		self._sub_segments_at_depth(0, depth)
-	}
-	fn _sub_segments_at_depth(&self, current_depth:usize, target_depth:usize) -> Vec<&NestedCodeSegment> {
-		if current_depth == target_depth {
-			vec![self]
-		} else if current_depth > target_depth {
-			Vec::new()
-		} else {
-			let child_depth:usize = current_depth + 1;
-			self.sub_segments.iter().map(|child| child._sub_segments_at_depth(child_depth, target_depth)).flatten().collect()
+		match self {
+			NestedSegment::Code(code) => &code.type_name,
+			NestedSegment::Contents(_) => CONTENTS_NAME,
+			NestedSegment::WhiteSpace(_) => WHITESPACE_NAME,
 		}
 	}
 
-	/// Get a flat list of self and all children and their depth.
-	pub fn flat(&self) -> Vec<(usize, &NestedCodeSegment)> {
-		self._flat(0)
-	}
-	fn _flat(&self, current_depth:usize) -> Vec<(usize, &NestedCodeSegment)> {
-		let mut flattened_with_depth:Vec<(usize, &NestedCodeSegment)> = vec![(current_depth, self)];
-		let child_depth:usize = current_depth + 1;
-		flattened_with_depth.extend(self.sub_segments.iter().map(|child| child._flat(child_depth)).flatten().collect::<Vec<(usize, &NestedCodeSegment)>>());
-		flattened_with_depth
+	/// Wether or not the type is code.
+	pub fn is_code(&self) -> bool {
+		matches!(self, NestedSegment::Code(_))
 	}
 
+	/// Wether or not the type is contents.
+	pub fn is_contents(&self) -> bool {
+		matches!(self, NestedSegment::Contents(_))
+	}
 
-	/// Get a flat list of all matched sub-segments.
-	pub fn flat_segments_matched(&self) -> Vec<(usize, &NestedCodeSegment)> {
-		let mut segments:Vec<(usize, &NestedCodeSegment)> = self.flat();
-		segments.retain(|segment| segment.1.matched);
+	/// Wether or not the type is whitespace.
+	pub fn is_whitespace(&self) -> bool {
+		matches!(self, NestedSegment::WhiteSpace(_))
+	}
+
+	/// Wether or not the struct has no contents.
+	pub fn is_empty(&self) -> bool {
+		match self {
+		    NestedSegment::Code(code) => code.open_tag.is_empty() && code.sub_segments.is_empty() && code.close_tag.is_empty(),
+		    NestedSegment::Contents(contents) => contents.is_empty(),
+		    NestedSegment::WhiteSpace(contents) => contents.is_empty(),
+		}
+	}
+
+	/// Get the segments' sub-segments.
+	pub fn sub_segments(&self) -> &[NestedSegment] {
+		match self {
+			NestedSegment::Code(code) => &code.sub_segments,
+			_ => &[]
+		}
+	}
+
+	/// Get the segments' sub-segments mutable.
+	pub fn sub_segments_mut(&mut self) -> &mut [NestedSegment] {
+		match self {
+			NestedSegment::Code(code) => &mut code.sub_segments,
+			_ => &mut []
+		}
+	}
+
+	/// Recursively get the segments' sub-segments flattened with their depth.
+	pub fn flat(&self) -> Vec<(usize, &NestedSegment)> {
+		let mut segments:Vec<(usize, &NestedSegment)> = Vec::new();
+		self._flat(&mut segments, 0);
 		segments
 	}
+	fn _flat<'a>(&'a self, result_list:&mut Vec<(usize, &'a NestedSegment)>, depth:usize) {
+		result_list.push((depth, self));
+		for sub_segment in self.sub_segments() {
+			sub_segment._flat(result_list, depth + 1);
+		}
+	}
 
-	/// Get a flat list of all unmatched sub-segments.
-	pub fn flat_sub_segments_unmatched(&self) -> Vec<(usize, &NestedCodeSegment)> {
-		let mut segments:Vec<(usize, &NestedCodeSegment)> = self.flat();
-		segments.retain(|segment| !segment.1.matched);
+	/// Recursively get the segments' sub-segments mutable, flattened with their depth.
+	pub fn flat_mut(&mut self) -> Vec<(usize, &mut NestedSegment)> {
+		let mut segments:Vec<(usize, &mut NestedSegment)> = Vec::new();
+		self._flat_mut(&mut segments, 0);
 		segments
+	}
+	fn _flat_mut<'a>(&'a mut self, result_list:&mut Vec<(usize, &'a mut NestedSegment)>, depth:usize) {
+		let self_pointer:*mut NestedSegment = self as *mut NestedSegment;
+		result_list.push((depth, unsafe { &mut *self_pointer }));
+		for sub_segment in self.sub_segments_mut() {
+			sub_segment._flat_mut(result_list, depth + 1);
+		}
+	}
+
+
+
+	/* ACTION METHODS */
+
+	/// Remove all white-space from the tree.
+	pub fn remove_whitespace(&mut self) {
+		self.retain_child_segments(|_, segment| !segment.is_whitespace());
+	}
+
+	/// Retain all child segments in the recursive tree from a filter based on depth and the segment.
+	pub fn retain_child_segments<T>(&mut self, filter:T) where T:Fn(usize, &NestedSegment) -> bool {
+		self._retain_child_segments(0, &filter);
+	}
+	fn _retain_child_segments<T>(&mut self, depth:usize, filter:&T) where T:Fn(usize, &NestedSegment) -> bool {
+		match self {
+			NestedSegment::Code(code) => {
+				let mut index:usize = 0;
+				while index < code.sub_segments.len() {
+					let segment:&mut NestedSegment = &mut code.sub_segments[index];
+					if filter(depth, segment) {
+						segment._retain_child_segments(depth + 1, filter);
+						index += 1;
+					} else {
+						code.sub_segments.remove(index);
+					}
+				}
+			},
+			_ => {}
+		}
+	}
+
+	/// Create a string from sub-contents only.
+	pub fn sub_contents_to_string(&self) -> String {
+		self.sub_segments().iter().map(|sub_segment| sub_segment.to_string()).collect::<Vec<String>>().join("")
 	}
 }
-impl Debug for NestedCodeSegment {
+impl ToString for NestedSegment {
+	fn to_string(&self) -> String {
+		match self {
+			NestedSegment::Code(code) => format!("{}{}{}", code.open_tag, code.sub_segments.iter().map(|segment| segment.to_string()).collect::<Vec<String>>().join(""), code.close_tag),
+			NestedSegment::Contents(contents) => contents.clone(),
+			NestedSegment::WhiteSpace(whitespace) => whitespace.clone()
+		}
+	}
+}
+impl Debug for NestedSegment {
 	fn fmt(&self, f:&mut fmt::Formatter<'_>) -> fmt::Result {
 		const PADDING:&str = "\t";
 		write!(
@@ -128,32 +172,21 @@ impl Debug for NestedCodeSegment {
 			"{} {}\n{}\n{}",
 			self.type_name(),
 			'{',
-				self.sub_segments.iter().map(|code|
+				self.sub_segments().iter().map(|code|
 					format!("{:?}", code).split('\n').map(|line| PADDING.to_owned() + line).collect::<Vec<String>>().join("\n")
 				).collect::<Vec<String>>().join("\n"),
 			'}'
 		)
 	}
 }
-impl Index<usize> for NestedCodeSegment {
-	type Output = NestedCodeSegment;
+impl Index<usize> for NestedSegment {
+	type Output = NestedSegment;
 	fn index(&self, index:usize) -> &Self::Output {
-		&self.sub_segments[index]
+		&self.sub_segments()[index]
 	}
 }
-impl IndexMut<usize> for NestedCodeSegment {
+impl IndexMut<usize> for NestedSegment {
 	fn index_mut(&mut self, index:usize) -> &mut Self::Output {
-		&mut self.sub_segments[index]
-	}
-}
-impl Index<&str> for NestedCodeSegment {
-	type Output = NestedCodeSegment;
-	fn index(&self, index:&str) -> &Self::Output {
-		self.sub_segments.iter().find(|child| child.type_name() == index).unwrap()
-	}
-}
-impl IndexMut<&str> for NestedCodeSegment {
-	fn index_mut(&mut self, index:&str) -> &mut Self::Output {
-		self.sub_segments.iter_mut().find(|child| child.type_name() == index).unwrap()
+		&mut self.sub_segments_mut()[index]
 	}
 }

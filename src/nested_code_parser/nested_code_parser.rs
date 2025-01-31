@@ -1,11 +1,9 @@
-use super::{ MatchMethod, LazyMatchSource, NestedCodeSegment, SegmentIdentification };
+use super::{ MatchMethod, LazyMatchSource, NestedSegment, SegmentIdentification };
 use std::ops::Range;
 
 
 
 pub const ROOT_NAME:&str = "ROOT";
-pub const UNMATCHED_NAME:&str = "UNMATCHED";
-pub const UNMATCHED_WHITESPACE_NAME:&str = "UNMATCHED_WHITESPACE";
 
 
 
@@ -36,7 +34,7 @@ impl NestedCodeParser {
 	/* USAGE METHODS */
 
 	/// Parse some code.
-	pub fn parse<'b>(&self, contents:&'b str) -> NestedCodeSegment {
+	pub fn parse<'b>(&self, contents:&'b str) -> NestedSegment {
 		let mut parser:InnerNestedCodeParser<'_, 'b> = InnerNestedCodeParser::new(self, contents);
 		parser.parse(None)
 	}
@@ -69,8 +67,8 @@ impl<'a, 'b> InnerNestedCodeParser<'a, 'b> {
 	/* USAGE METHODS */
 
 	/// Parse one single code snippet.
-	fn parse(&mut self, scope_terminator:Option<(Range<usize>, &SegmentIdentification)>) -> NestedCodeSegment {
-		let mut children:Vec<NestedCodeSegment> = Vec::new();
+	fn parse(&mut self, scope_terminator:Option<(Range<usize>, &SegmentIdentification)>) -> NestedSegment {
+		let mut children:Vec<NestedSegment> = Vec::new();
 		while self.cursor < self.contents.len() {
 			
 			// Try to match closing tag.
@@ -82,7 +80,7 @@ impl<'a, 'b> InnerNestedCodeParser<'a, 'b> {
 					let start:usize = self.cursor;
 					self.cursor += match_length;
 					self.unmatched_cursor = self.cursor;
-					return NestedCodeSegment::new(&target_identification.name, true, self.contents, open_tag_location.clone(), start..self.cursor, children);
+					return NestedSegment::new_code(&target_identification.name, &self.contents[open_tag_location.clone()], children, &self.contents[start..self.cursor]);
 				}
 			}
 
@@ -109,29 +107,26 @@ impl<'a, 'b> InnerNestedCodeParser<'a, 'b> {
 
 		// If target end not found, consider end of string the end of the tag.
 		if let Some((open_tag_location, target_identification)) = scope_terminator {
-			return NestedCodeSegment::new(&target_identification.name, true, self.contents, open_tag_location.clone(), self.unmatched_cursor..self.cursor, children);
+			return NestedSegment::new_code(&target_identification.name, &self.contents[open_tag_location.clone()], children, &self.contents[self.unmatched_cursor..self.cursor]);
 		}
 		
 		// No active expected end meant this is the root element.
 		if let Some(from_unmatched) = self.code_from_unmatched() {
 			children.push(from_unmatched);
 		}
-		NestedCodeSegment::new(ROOT_NAME, false, &self.contents, 0..self.contents.len(), 0..self.contents.len(), children)
+		NestedSegment::new_code(ROOT_NAME, &self.contents[0..self.contents.len()], children, &self.contents[0..self.contents.len()])
 	}
 
 	/// Create a snippet from unmatched code at the cursor.
-	fn code_from_unmatched(&self) -> Option<NestedCodeSegment> {
+	fn code_from_unmatched(&self) -> Option<NestedSegment> {
 		if self.unmatched_cursor != self.cursor {
-			let unmatched_contents:&'b str = &self.contents[self.unmatched_cursor..self.cursor];
-			let is_white_space:bool = unmatched_contents.chars().all(|character| character.is_whitespace());
-			if is_white_space && self.origin.ignore_white_space_segments {
-				return None;
+			let contents:&str = &self.contents[self.unmatched_cursor..self.cursor];
+			let is_whitespace:bool = contents.chars().all(|char| char.is_whitespace());
+			if !is_whitespace || !self.origin.ignore_white_space_segments {
+				return Some(NestedSegment::new_contents(contents));
 			}
-			let name:&str = if is_white_space { UNMATCHED_WHITESPACE_NAME } else { UNMATCHED_NAME };
-			Some(NestedCodeSegment::new(name, false, &self.contents, self.unmatched_cursor..self.unmatched_cursor, self.cursor..self.cursor, Vec::new()))
-		} else {
-			None
 		}
+		None
 	}
 
 	/// Checks wether or not the contents at the cursor match the given tag. Returns the length of the match in contents or None.
