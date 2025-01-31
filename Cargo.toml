@@ -7,5 +7,3 @@ edition = "2021"
 file_ref={ git="https://github.com/SuccessfullyFailed/file_ref.git" }
 regex = "1.11.1"
 
-[build-dependencies]
-crate_manager={ git="https://github.com/SuccessfullyFailed/crate_manager.git" }
