@@ -112,4 +112,15 @@ mod tests {
 		let parser:NestedCodeParser = NestedCodeParser::new(vec![&("comment", "^//.+\n")]);
 		assert_eq!(parser.parse("-- // test\n --").sub_segments()[1].to_string(), "// test\n");
 	}
+
+	#[test]
+	fn test_flatten_and_inflate() {
+		let parser:NestedCodeParser = example_parser();
+		let result:NestedSegment = parser.parse(EXAMPLE_TEXT);
+		println!("{:?}", result);
+
+		let flat:Vec<(usize, NestedSegment)> = result.clone().to_flat();
+		let validation:NestedSegment = NestedSegment::from_flat(flat).unwrap();
+		assert_eq!(result, validation);
+	}
 }
