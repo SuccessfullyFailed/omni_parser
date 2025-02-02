@@ -58,14 +58,22 @@ impl LazyMatchSource for (&str, bool, &str, Option<&str>, &str, Option<&str>) {
 		SegmentIdentification::new(
 			self.0,
 			self.1,
-			MatchMethod::CharCompare(
-				self.2.to_string(),
-				self.3.map(|value| value.to_string())
-			),
-			MatchMethod::CharCompare(
-				self.4.to_string(),
-				self.5.map(|value| value.to_string())
-			)
+			if self.2.starts_with('^') && self.3.is_none() {
+				MatchMethod::Regex(Regex::new(&self.2).expect("Could not parse regex"))
+			} else {
+				MatchMethod::CharCompare(
+					self.2.to_string(),
+					self.3.map(|value| value.to_string())
+				)
+			},
+			if self.4.starts_with('^') && self.5.is_none() {
+				MatchMethod::Regex(Regex::new(&self.4).expect("Could not parse regex"))
+			} else {
+				MatchMethod::CharCompare(
+					self.4.to_string(),
+					self.5.map(|value| value.to_string())
+				)
+			}
 		)
 	}
 }
