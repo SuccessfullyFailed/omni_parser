@@ -43,6 +43,11 @@ impl LazyMatchSource for SegmentIdentification {
 		self.clone()
 	}
 }
+impl LazyMatchSource for (&str, &str, &str) {
+	fn to_identification(&self) -> SegmentIdentification {
+		(self.0, false, self.1, None, self.2, None).to_identification()
+	}
+}
 impl LazyMatchSource for (&str, bool, &str, &str) {
 	fn to_identification(&self) -> SegmentIdentification {
 		(self.0, self.1, self.2, None, self.3, None).to_identification()
