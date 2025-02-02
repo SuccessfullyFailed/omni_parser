@@ -4,9 +4,9 @@ use std::{ fmt::{ self, Debug }, ops::{ Index, IndexMut } };
 
 pub(super) const CONTENTS_NAME:&str = "contents";
 pub(super) const WHITESPACE_NAME:&str = "whitespace";
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct NestedSegmentCode { pub type_name:String, pub open_tag:String, pub sub_segments:Vec<NestedSegment>, pub close_tag:String }
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum NestedSegment { Code(NestedSegmentCode), Contents(String), WhiteSpace(String) }
 impl NestedSegment {
 
@@ -37,6 +37,23 @@ impl NestedSegment {
 	pub fn without_whitespace(mut self) -> Self {
 		self.remove_whitespace();
 		self
+	}
+
+	/// Build a code segment from a flat list.
+	pub fn from_flat(mut segments:Vec<(usize, NestedSegment)>) -> Option<NestedSegment> {
+		Self::_from_flat(&mut segments, 0)
+	}
+	fn _from_flat(segments:&mut Vec<(usize, NestedSegment)>, target_depth:usize) -> Option<NestedSegment> {
+		if segments.is_empty() || segments[0].0 != target_depth {
+			None
+		} else {
+			let mut element:NestedSegment = segments.remove(0).1;
+			let child_target_depth:usize = target_depth + 1;
+			while let Some(child) = NestedSegment::_from_flat(segments, child_target_depth) {
+				element.sub_segments_mut().push(child);
+			}
+			Some(element)
+		}
 	}
 
 
@@ -85,16 +102,33 @@ impl NestedSegment {
 	}
 
 	/// Get the segments' sub-segments mutable.
-	pub fn sub_segments_mut(&mut self) -> &mut [NestedSegment] {
+	pub fn sub_segments_mut(&mut self) -> &mut Vec<NestedSegment> {
 		match self {
 			NestedSegment::Code(code) => &mut code.sub_segments,
-			_ => &mut []
+			_ => {
+				static mut FAKE_LIST:Vec<NestedSegment> = Vec::new();
+				unsafe { FAKE_LIST.as_mut() }
+			}
 		}
 	}
 
 
 
 	/* FLATTENING METHODS */
+
+	/// Turn self into a flat owned list.
+	pub fn to_flat(self) -> Vec<(usize, NestedSegment)> {
+		let mut segments:Vec<(usize, NestedSegment)> = Vec::new();
+		self._to_flat(&mut segments, 0);
+		segments
+	}
+	fn _to_flat(mut self, segments:&mut Vec<(usize, NestedSegment)>, depth:usize) {
+		let children:Vec<NestedSegment> = match &mut self { NestedSegment::Code(code) => code.sub_segments.drain(..).collect(), _ => Vec::new() };
+		segments.push((depth, self));
+		for child in children {
+			child._to_flat(segments, depth + 1);
+		}
+	}
 
 	/// Recursively get filtered segments and sub-segments flattened with their depth.
 	pub fn flat_filtered<T>(&self, filter:T) -> Vec<(usize, &NestedSegment)> where T:Fn(usize, &NestedSegment) -> bool {
