@@ -1,12 +1,14 @@
 use std::{ fmt::{ self, Debug }, ops::{ Index, IndexMut } };
 
+use super::ROOT_NAME;
+
 
 
 pub(super) const CONTENTS_NAME:&str = "contents";
 pub(super) const WHITESPACE_NAME:&str = "whitespace";
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct NestedSegmentCode { pub type_name:String, pub open_tag:String, pub sub_segments:Vec<NestedSegment>, pub close_tag:String }
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum NestedSegment { Code(NestedSegmentCode), Contents(String), WhiteSpace(String) }
 impl NestedSegment {
 
@@ -37,6 +39,46 @@ impl NestedSegment {
 	pub fn without_whitespace(mut self) -> Self {
 		self.remove_whitespace();
 		self
+	}
+
+	/// Build a code segment from a flat list.
+	pub fn from_flat(mut segments:Vec<(usize, NestedSegment)>) -> Option<NestedSegment> {
+		if segments.is_empty() {
+			return None;
+		}
+		let mut cursor:usize = segments.len() - 1;
+		Self::process_flat_list_to_tree(&mut segments, &mut cursor, 0);
+		match segments.len() {
+			0 => None,
+			1 => Some(segments.remove(0).1),
+			_ => Some(NestedSegment::new_code(ROOT_NAME, "", segments.iter().map(|(_, segment)| segment.clone()).collect::<Vec<NestedSegment>>(), ""))
+		}
+	}
+	fn process_flat_list_to_tree(segments:&mut Vec<(usize, NestedSegment)>, cursor:&mut usize, parse_until_depth:usize) {
+
+		// From last to first, try combine children.
+		while !segments.is_empty() && *cursor > 0 && segments[*cursor].0 >= parse_until_depth {
+			let current_depth:usize = segments[*cursor].0;
+			let previous_depth:usize = segments[*cursor - 1].0;
+
+			// If depth increased, make current segment and siblings children of previous segment.
+			if current_depth > previous_depth {
+				while *cursor < segments.len() && segments[*cursor].0 > previous_depth {
+					let child:NestedSegment = segments.remove(*cursor).1;
+					segments[*cursor - 1].1.sub_segments_mut().push(child);
+				}
+			}
+			
+			// If depth decreased, parse deeper level first.
+			else if current_depth < previous_depth {
+				*cursor -= 1;
+				Self::process_flat_list_to_tree(segments, cursor, previous_depth);
+				*cursor += 1;
+				continue;
+			}
+
+			*cursor -= 1;
+		}
 	}
 
 
@@ -85,16 +127,33 @@ impl NestedSegment {
 	}
 
 	/// Get the segments' sub-segments mutable.
-	pub fn sub_segments_mut(&mut self) -> &mut [NestedSegment] {
+	pub fn sub_segments_mut(&mut self) -> &mut Vec<NestedSegment> {
 		match self {
 			NestedSegment::Code(code) => &mut code.sub_segments,
-			_ => &mut []
+			_ => {
+				static mut FAKE_LIST:Vec<NestedSegment> = Vec::new();
+				unsafe { FAKE_LIST.as_mut() }
+			}
 		}
 	}
 
 
 
 	/* FLATTENING METHODS */
+
+	/// Turn self into a flat owned list.
+	pub fn to_flat(self) -> Vec<(usize, NestedSegment)> {
+		let mut segments:Vec<(usize, NestedSegment)> = Vec::new();
+		self._to_flat(&mut segments, 0);
+		segments
+	}
+	fn _to_flat(mut self, segments:&mut Vec<(usize, NestedSegment)>, depth:usize) {
+		let children:Vec<NestedSegment> = match &mut self { NestedSegment::Code(code) => code.sub_segments.drain(..).collect(), _ => Vec::new() };
+		segments.push((depth, self));
+		for child in children {
+			child._to_flat(segments, depth + 1);
+		}
+	}
 
 	/// Recursively get filtered segments and sub-segments flattened with their depth.
 	pub fn flat_filtered<T>(&self, filter:T) -> Vec<(usize, &NestedSegment)> where T:Fn(usize, &NestedSegment) -> bool {
