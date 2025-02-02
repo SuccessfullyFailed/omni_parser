@@ -1,7 +1,5 @@
 use std::{ fmt::{ self, Debug }, ops::{ Index, IndexMut } };
 
-use super::ROOT_NAME;
-
 
 
 pub(super) const CONTENTS_NAME:&str = "contents";
@@ -43,41 +41,18 @@ impl NestedSegment {
 
 	/// Build a code segment from a flat list.
 	pub fn from_flat(mut segments:Vec<(usize, NestedSegment)>) -> Option<NestedSegment> {
-		if segments.is_empty() {
-			return None;
-		}
-		let mut cursor:usize = segments.len() - 1;
-		Self::process_flat_list_to_tree(&mut segments, &mut cursor, 0);
-		match segments.len() {
-			0 => None,
-			1 => Some(segments.remove(0).1),
-			_ => Some(NestedSegment::new_code(ROOT_NAME, "", segments.iter().map(|(_, segment)| segment.clone()).collect::<Vec<NestedSegment>>(), ""))
-		}
+		Self::_from_flat(&mut segments, 0)
 	}
-	fn process_flat_list_to_tree(segments:&mut Vec<(usize, NestedSegment)>, cursor:&mut usize, parse_until_depth:usize) {
-
-		// From last to first, try combine children.
-		while !segments.is_empty() && *cursor > 0 && segments[*cursor].0 >= parse_until_depth {
-			let current_depth:usize = segments[*cursor].0;
-			let previous_depth:usize = segments[*cursor - 1].0;
-
-			// If depth increased, make current segment and siblings children of previous segment.
-			if current_depth > previous_depth {
-				while *cursor < segments.len() && segments[*cursor].0 > previous_depth {
-					let child:NestedSegment = segments.remove(*cursor).1;
-					segments[*cursor - 1].1.sub_segments_mut().push(child);
-				}
+	fn _from_flat(segments:&mut Vec<(usize, NestedSegment)>, target_depth:usize) -> Option<NestedSegment> {
+		if segments.is_empty() || segments[0].0 != target_depth {
+			None
+		} else {
+			let mut element:NestedSegment = segments.remove(0).1;
+			let child_target_depth:usize = target_depth + 1;
+			while let Some(child) = NestedSegment::_from_flat(segments, child_target_depth) {
+				element.sub_segments_mut().push(child);
 			}
-			
-			// If depth decreased, parse deeper level first.
-			else if current_depth < previous_depth {
-				*cursor -= 1;
-				Self::process_flat_list_to_tree(segments, cursor, previous_depth);
-				*cursor += 1;
-				continue;
-			}
-
-			*cursor -= 1;
+			Some(element)
 		}
 	}
 
