@@ -162,6 +162,41 @@ impl NestedSegment {
 	}
 
 
+	/// Get a mutable sub-segment at a specific index, where 0 is self.
+	pub fn sub_segment_at_index(&self, target_index:usize) -> Option<&NestedSegment> {
+		let mut cursor:usize = 0;
+		self._sub_segment_at_index(&mut cursor, target_index)
+	}
+	fn _sub_segment_at_index(&self, cursor:&mut usize, target_index:usize) -> Option<&NestedSegment> {
+		if *cursor == target_index {
+			return Some(self);
+		}
+		*cursor += 1;
+		for child in self.sub_segments() {
+			child._sub_segment_at_index(cursor, target_index);
+			*cursor += 1;
+		}
+		None
+	}
+
+	/// Get a mutable sub-segment at a specific index, where 0 is self.
+	pub fn sub_segment_at_index_mut(&mut self, target_index:usize) -> Option<&mut NestedSegment> {
+		let mut cursor:usize = 0;
+		self._sub_segment_at_index_mut(&mut cursor, target_index)
+	}
+	fn _sub_segment_at_index_mut(&mut self, cursor:&mut usize, target_index:usize) -> Option<&mut NestedSegment> {
+		if *cursor == target_index {
+			return Some(self);
+		}
+		*cursor += 1;
+		for child in self.sub_segments_mut() {
+			child._sub_segment_at_index_mut(cursor, target_index);
+			*cursor += 1;
+		}
+		None
+	}
+
+
 
 	/* FLATTENING METHODS */
 
