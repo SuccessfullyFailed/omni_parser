@@ -114,6 +114,55 @@ impl NestedSegment {
 
 
 
+	/* PATH METHODS */
+
+	/// Find a sub-segment from a path.
+	pub fn sub_segment_at_path(&self, path:&[usize]) -> Option<&NestedSegment> {
+		if path.is_empty() {
+			Some(self)
+		} else {
+			let sub_segments:&[NestedSegment] = self.sub_segments();
+			if sub_segments.len() < path[0] {
+				sub_segments[path[0]].sub_segment_at_path(&path[1..])
+			} else {
+				None
+			}
+		}
+	}
+
+	/// Find a mutable sub-segment from a path.
+	pub fn sub_segment_at_path_mut(&mut self, path:&[usize]) -> Option<&mut NestedSegment> {
+		if path.is_empty() {
+			Some(self)
+		} else {
+			let sub_segments:&mut Vec<NestedSegment> = self.sub_segments_mut();
+			if sub_segments.len() < path[0] {
+				sub_segments[path[0]].sub_segment_at_path_mut(&path[1..])
+			} else {
+				None
+			}
+		}
+	}
+
+	/// Find the path to a specific sub-segment.
+	pub fn path_to<T>(&self, identification_method:T) -> Option<Vec<usize>> where T:Fn(&NestedSegment) -> bool {
+		self._path_to(&identification_method)
+	}
+	fn _path_to(&self, identification_method:&dyn Fn(&NestedSegment) -> bool) -> Option<Vec<usize>> {
+		if identification_method(self) {
+			return Some(Vec::new());
+		}
+		for (child_index, child) in self.sub_segments().iter().enumerate() {
+			if let Some(mut result) = child.path_to(identification_method) {
+				result.insert(0, child_index);
+				return Some(result);
+			}
+		}
+		None
+	}
+
+
+
 	/* FLATTENING METHODS */
 
 	/// Turn self into a flat owned list.
@@ -243,6 +292,14 @@ impl NestedSegment {
 	pub fn sub_contents_to_string(&self) -> String {
 		self.sub_segments().iter().map(|sub_segment| sub_segment.to_string()).collect::<Vec<String>>().join("")
 	}
+
+	/// Build a segments iterator.
+	pub fn iter(&self) -> NestedSegmentIterator {
+		NestedSegmentIterator {
+			source: self,
+			cursor: Vec::new()
+		}
+	}
 }
 impl ToString for NestedSegment {
 	fn to_string(&self) -> String {
@@ -277,5 +334,48 @@ impl Index<usize> for NestedSegment {
 impl IndexMut<usize> for NestedSegment {
 	fn index_mut(&mut self, index:usize) -> &mut Self::Output {
 		&mut self.sub_segments_mut()[index]
+	}
+}
+impl Index<Vec<usize>> for NestedSegment {
+	type Output = NestedSegment;
+	fn index(&self, index:Vec<usize>) -> &Self::Output {
+		self.sub_segment_at_path(&index).unwrap()
+	}
+}
+impl IndexMut<Vec<usize>> for NestedSegment {
+	fn index_mut(&mut self, index:Vec<usize>) -> &mut Self::Output {
+		self.sub_segment_at_path_mut(&index).unwrap()
+	}
+}
+
+
+
+pub struct NestedSegmentIterator<'a> {
+	source:&'a NestedSegment,
+	cursor:Vec<usize>
+}
+impl<'a> Iterator for NestedSegmentIterator<'a> {
+	type Item = &'a NestedSegment;
+
+	fn next(&mut self) -> Option<Self::Item> {
+
+		// Try from cursor path.
+		if let Some(element) = self.source.sub_segment_at_path(&self.cursor) {
+			if !element.sub_segments().is_empty() {
+				self.cursor.push(0);
+			} else {
+				*self.cursor.last_mut().unwrap() += 1;
+			}
+			return Some(element);
+		}
+
+		// Find next item if cursor invalid.
+		self.cursor.pop();
+		if self.cursor.is_empty() {
+			None
+		} else {
+			*self.cursor.last_mut().unwrap() += 1;
+			self.next()
+		}
 	}
 }
