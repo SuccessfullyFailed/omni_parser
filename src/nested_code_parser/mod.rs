@@ -2,6 +2,7 @@
 mod nested_code;
 mod nested_code_parser;
 mod nested_code_parser_u;
+mod nested_code_ref;
 mod segment_identification;
 mod languages;
 pub use nested_code::*;

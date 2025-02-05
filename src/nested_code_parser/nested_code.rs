@@ -482,30 +482,35 @@ impl<'a> Iterator for NestedSegmentIterator<'a> {
 	type Item = &'a NestedSegment;
 
 	fn next(&mut self) -> Option<Self::Item> {
+		let target_segment:Option<&NestedSegment> = self.0.get();
 
-		// Try child.
-		if let Some(child_ref) = self.0.child() {
-			self.0 = child_ref.clone();
-			return Some(child_ref.get().unwrap());
-		}
-
-		// Try next sibling.
-		if let Some(sibling_ref) = self.0.next_sibling() {
-			self.0 = sibling_ref.clone();
-			return Some(sibling_ref.get().unwrap());
-		}
-
-		// Try next parent sibling.
-		while let Some(parent_ref) = self.0.parent() {
-			if let Some(parent_sibling_ref) = parent_ref.next_sibling() {
-				self.0 = parent_sibling_ref;
-				return Some(parent_ref.get().unwrap());
+		// Try to move the cursor to the next segment.
+		if target_segment.is_some() {
+			let mut found_next:bool = false;
+			if let Some(child_ref) = self.0.child() {
+				self.0 = child_ref;
+				found_next = true;
+			} else if let Some(sibling_ref) = self.0.next_sibling() {
+				self.0 = sibling_ref;
+				found_next = true;
 			} else {
-				self.0 = parent_ref;
+				while let Some(parent_ref) = self.0.parent() {
+					if let Some(parent_sibling_ref) = parent_ref.next_sibling() {
+						self.0 = parent_sibling_ref;
+						found_next = true;
+					} else {
+						self.0 = parent_ref;
+					}
+				}
+			}
+
+			// If no next cursor found, set cursor to impossible ID.
+			if !found_next {
+				self.0.target_path = vec![NestedSegment::new_id()];
 			}
 		}
 
 		// Nothing found.
-		None
+		target_segment
 	}
 }
