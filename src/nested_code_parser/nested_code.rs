@@ -132,16 +132,23 @@ impl NestedSegment {
 	}
 
 	/// Get a reference to a specific segment.
-	pub fn find<T>(&self, identification_method:T) -> Option<Vec<usize>> where T:Fn(&NestedSegment) -> bool {
-		self._find(&identification_method)
+	pub fn find<T>(&self, identification_method:T) -> Option<NestedSegmentRef> where T:Fn(&NestedSegment) -> bool {
+		self.path_to(&identification_method).map(|path| NestedSegmentRef::new(self, path))
 	}
-	fn _find(&self, identification_method:&dyn Fn(&NestedSegment) -> bool) -> Option<Vec<usize>> {
+
+	/// Get a reference to a segment with a specific ID.
+	pub fn find_by_id(&self, id:u64) -> Option<NestedSegmentRef> {
+		self.find(move |segment| segment.id() == id)
+	}
+
+	/// Find a path to a sub-segment that matches the filter.
+	fn path_to(&self, identification_method:&dyn Fn(&NestedSegment) -> bool) -> Option<Vec<u64>> {
 		if identification_method(self) {
 			return Some(Vec::new());
 		}
-		for (child_index, child) in self.sub_segments().iter().enumerate() {
+		for child in self.sub_segments() {
 			if let Some(mut result) = child.path_to(identification_method) {
-				result.insert(0, child_index);
+				result.insert(0, child.id());
 				return Some(result);
 			}
 		}
@@ -247,24 +254,6 @@ impl NestedSegment {
 
 
 	/* PATH METHODS */
-
-	/// Find the path to a specific sub-segment.
-	pub fn path_to<T>(&self, identification_method:T) -> Option<Vec<usize>> where T:Fn(&NestedSegment) -> bool {
-		self._find(&identification_method)
-	}
-	fn _path_to(&self, identification_method:&dyn Fn(&NestedSegment) -> bool) -> Option<Vec<usize>> {
-		if identification_method(self) {
-			return Some(Vec::new());
-		}
-		for (child_index, child) in self.sub_segments().iter().enumerate() {
-			if let Some(mut result) = child.path_to(identification_method) {
-				result.insert(0, child_index);
-				return Some(result);
-			}
-		}
-		None
-	}
-
 
 	/// Get a mutable sub-segment at a specific index, where 0 is self.
 	pub fn sub_segment_at_index(&self, target_index:usize) -> Option<&NestedSegment> {
