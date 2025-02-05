@@ -114,7 +114,7 @@ impl<'a, 'b> InnerNestedCodeParser<'a, 'b> {
 		if let Some(from_unmatched) = self.code_from_unmatched() {
 			children.push(from_unmatched);
 		}
-		NestedSegment::new_code(ROOT_NAME, &self.contents[0..self.contents.len()], children, &self.contents[0..self.contents.len()])
+		NestedSegment::new_code(ROOT_NAME, &self.contents[0..0], children, &self.contents[0..0])
 	}
 
 	/// Create a snippet from unmatched code at the cursor.
