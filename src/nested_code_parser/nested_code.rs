@@ -435,9 +435,44 @@ impl<'a> NestedSegmentRef<'a> {
 		}
 	}
 
+	/// Get all siblings.
+	pub fn all_siblings(&self) -> Option<Vec<NestedSegmentRef<'a>>> {
+		if let Some(parent_ref) = self.parent() {
+			if let Some(parent) = parent_ref.get() {
+				return Some(
+					parent.sub_segments().iter().map(|seg| {
+						let mut child_ref = parent_ref.clone();
+						child_ref.target_path.push(seg.id());
+						child_ref
+					}).collect::<Vec<NestedSegmentRef>>()
+				);
+			}
+		}
+		None
+	}
+
+	/// Get the index of this segment in it's siblings.
+	pub fn own_sibling_index(&self) -> Option<usize> {
+		self.all_siblings().map(|siblings| self.own_index_in(&siblings)).flatten()
+	}
+
+	/// Get the index of this segment in the given list.
+	fn own_index_in(&self, list:&[NestedSegmentRef]) -> Option<usize> {
+		if let Some(own_last_id) = self.target_path.last() {
+			for (index, segment_ref) in list.iter().enumerate() {
+				if let Some(compare_last_id) = segment_ref.target_path.last() {
+					if own_last_id == compare_last_id {
+						return Some(index);
+					}
+				}
+			}
+		}
+		None
+	}
+
 	/// Get a sibling at a specific offset.
 	pub fn sibling_at_offset(&self, offset:isize) -> Option<NestedSegmentRef<'a>> {
-		if let Some(parent) = self.parent().map(|parent| parent.get()).unwrap_or(None) {
+		if let Some(parent) = self.parent().map(|parent| parent.get()).flatten() {
 			let siblings:&[NestedSegment] = parent.sub_segments();
 			if let Some(last_path_node) = self.target_path.last() {
 				if let Some(own_index) = siblings.iter().position(|sibling| sibling.id() == *last_path_node) {
@@ -461,6 +496,26 @@ impl<'a> NestedSegmentRef<'a> {
 	/// Get the previous sibling.
 	pub fn previous_sibling(&self) -> Option<NestedSegmentRef<'a>> {
 		self.sibling_at_offset(-1)
+	}
+
+	/// Get all next siblings.
+	pub fn next_siblings(&self) -> Option<Vec<NestedSegmentRef<'a>>> {
+		if let Some(siblings) = self.all_siblings() {
+			if let Some(own_index) = self.own_index_in(&siblings) {
+				return Some(siblings[own_index + 1..].to_vec());
+			}
+		}
+		None
+	}
+
+	/// Get all previous siblings.
+	pub fn previous_siblings(&self) -> Option<Vec<NestedSegmentRef<'a>>> {
+		if let Some(siblings) = self.all_siblings() {
+			if let Some(own_index) = self.own_index_in(&siblings) {
+				return Some(siblings[..own_index].to_vec());
+			}
+		}
+		None
 	}
 }
 
